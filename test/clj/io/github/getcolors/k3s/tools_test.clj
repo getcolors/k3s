@@ -77,7 +77,10 @@
       (is (not (str/includes? playbook "client-key-data")))
       (is (not (str/includes? gitops "client-key-data"))))))
 
-(deftest local-ssh-marker-cannot-collide-with-once
-  (let [dir (render-stage tools/ansible-local-step tools/ansible-local-tool {})]
-    (is (str/includes? (slurp (str dir "/main.yml"))
-                       "k3s {{ host_alias }} ANSIBLE MANAGED BLOCK"))))
+(deftest local-ssh-config-is-package-owned-and-usable-on-first-connect
+  (let [dir (render-stage tools/ansible-local-step tools/ansible-local-tool {})
+        rendered (slurp (str dir "/main.yml"))]
+    (is (str/includes? rendered "k3s {{ host_alias }} ANSIBLE MANAGED BLOCK"))
+    (is (str/includes? rendered "StrictHostKeyChecking accept-new")
+        "kubectl must not fail on the first connection to a newly created host")
+    (is (str/includes? rendered "ForwardAgent no"))))
