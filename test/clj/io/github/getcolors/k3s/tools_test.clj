@@ -38,6 +38,7 @@
 (deftest template-data-defaults-gitops-conventions
   (let [data (tools/data-fn {:profile "demo"})]
     (is (= "demo" (:host-alias data)))
+    (is (= "no-infra" (:provider-dns data)))
     (is (= "main" (:repository-branch data)))
     (is (= "./k8s" (:repository-path data)))
     (is (some? (:ip data)))))
@@ -65,12 +66,17 @@
       (is (str/includes? rendered "hcloud_server.node1.id")))))
 
 (deftest remote-stage-pins-k3s-and-flux-and-renders-gitops
-  (let [dir (render-stage tools/ansible-remote-step tools/ansible-remote-tool {})
+  (let [dir (render-stage tools/ansible-remote-step tools/ansible-remote-tool
+                          {:provider-dns "cloudflare"})
         playbook (slurp (str dir "/main.yml"))
         gitops (slurp (str dir "/gitops.yml"))]
     (is (str/includes? playbook "k3s/v1.36.2+k3s1/install.sh"))
     (is (str/includes? playbook "flux2/releases/download/v2.9.2/install.yaml"))
     (is (str/includes? playbook "--secrets-encryption"))
+    (is (str/includes? playbook "COLORS_PAR_CLOUDFLARE_API_TOKEN"))
+    (is (str/includes? playbook "namespace: cert-manager"))
+    (is (str/includes? playbook "namespace: external-dns"))
+    (is (not (str/includes? playbook "fixture-cloudflare-token")))
     (is (str/includes? gitops "https://github.com/getcolors/k3s-helloworld.git"))
     (is (str/includes? gitops "path: \"./k8s\""))
     (testing "no cluster credential is rendered"

@@ -54,7 +54,9 @@ rules provide the same tested default.
 
 The remote stage installs exact `k3s-version` and `flux-version` pins and applies
 a Flux GitRepository/Kustomization for `repository`, branch `main`, path
-`./k8s`. The local stage owns its SSH block; do not reuse ONCE's local playbook.
+`./k8s`. With `provider-dns: cloudflare`, it also streams the API token into
+Kubernetes Secrets for GitOps-managed ExternalDNS and cert-manager; no token is
+rendered. The local stage owns its SSH block; do not reuse ONCE's local playbook.
 
 ## Secrets and safety
 
@@ -66,6 +68,9 @@ a Flux GitRepository/Kustomization for `repository`, branch `main`, path
   invocation; do not edit the committed guard.
 - No kubeconfig is written under `.colors`. `./k3s kubectl` invokes the remote
   `k3s kubectl` over SSH.
+- Cloudflare credentials may appear only in process environment and Kubernetes
+  Secrets populated through Ansible stdin with `no_log`; never put a plaintext
+  Secret in the public GitOps repository.
 - The launcher contains dependency resolution and dispatch only. Put behaviour
   in testable library namespaces.
 

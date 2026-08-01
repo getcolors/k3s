@@ -32,7 +32,10 @@ desired state or performing a real lifecycle operation.
 
 Babashka runs the launcher. Lifecycle commands need OpenTofu and Ansible;
 `kubectl` access needs SSH. Hetzner uses `COLORS_PAR_HCLOUD_TOKEN`. R2 uses
-`COLORS_PAR_R2_ACCESS_KEY_ID` and `COLORS_PAR_R2_SECRET_ACCESS_KEY`.
+`COLORS_PAR_R2_ACCESS_KEY_ID` and `COLORS_PAR_R2_SECRET_ACCESS_KEY`. With
+`provider-dns: cloudflare`, ExternalDNS and cert-manager use
+`COLORS_PAR_CLOUDFLARE_API_TOKEN` through package-bootstrapped Kubernetes
+Secrets; the public GitOps repository contains only Secret references.
 
 ## Commands
 
@@ -61,7 +64,9 @@ Babashka runs the launcher. Lifecycle commands need OpenTofu and Ansible;
 
 Flux pulls from the repository, so GitHub receives no cluster credential and
 port 6443 stays closed. A hostless Traefik Ingress can serve HTTP at the VPS's
-public IP. Domain-based TLS is not part of v1.
+public IP. A repository may instead deploy ExternalDNS and cert-manager for
+Cloudflare DNS and ACME DNS-01 certificates; the package securely bootstraps
+their token Secrets when `provider-dns: cloudflare`.
 
 `./k3s kubectl` runs the server's `sudo k3s kubectl` through the managed SSH
 alias. It leaves stdin attached, so local YAML can be streamed with `-f -`.

@@ -6,7 +6,7 @@
    [io.github.getcolors.once.validate :as once-validate]))
 
 (def providers once-validate/providers)
-(def slots [:provider-compute :provider-backend])
+(def slots [:provider-compute :provider-dns :provider-backend])
 (def supported-compute #{"hcloud"})
 
 (defn- entry [opts slot]

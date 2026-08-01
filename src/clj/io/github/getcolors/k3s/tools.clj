@@ -104,6 +104,7 @@
          :ip (or (not-empty (str (:ip opts))) "192.168.0.1")
          :user (or (not-empty (str (:user opts))) "root")
          :host-alias (utils/host-alias opts)
+         :provider-dns (or (not-empty (str (:provider-dns opts))) "no-infra")
          :repository-branch (or (not-empty (str (:repository-branch opts))) "main")
          :repository-path (or (not-empty (str (:repository-path opts))) "./k8s")))
 

@@ -8,6 +8,7 @@
   {:profile "k3s-test"
    :workdir ".colors"
    :provider-compute "hcloud"
+   :provider-dns "no-infra"
    :provider-backend "local"
    :compute-prevent-destroy true
    :repository "https://github.com/getcolors/k3s-helloworld.git"
@@ -36,8 +37,8 @@
   (is (seq (matching (assoc base :provider-compute "azure")
                      #"unsupported :provider-compute"))))
 
-(deftest backend-and-compute-come-from-onces-registry
-  (is (= [:provider-compute :provider-backend] validate/slots))
+(deftest providers-come-from-onces-registry
+  (is (= [:provider-compute :provider-dns :provider-backend] validate/slots))
   (is (seq (matching (assoc base :provider-backend "gcs")
                      #"unsupported :provider-backend")))
   (let [r2 (assoc base :provider-backend "r2"
@@ -49,7 +50,14 @@
 (deftest secret-errors-name-colors-variables
   (is (str/includes? (first (validate/secret-errors base))
                      "COLORS_PAR_HCLOUD_TOKEN"))
-  (is (= [] (vec (validate/secret-errors (assoc base :hcloud-token "token"))))))
+  (is (= [] (vec (validate/secret-errors (assoc base :hcloud-token "token")))))
+  (let [cloudflare (assoc base :provider-dns "cloudflare")]
+    (is (str/includes? (str/join "\n" (validate/secret-errors cloudflare))
+                       "COLORS_PAR_CLOUDFLARE_API_TOKEN"))
+    (is (= [] (vec (validate/secret-errors
+                    (assoc cloudflare
+                           :hcloud-token "token"
+                           :cloudflare-api-token "token")))))))
 
 (deftest versions-are-explicit-release-pins
   (is (seq (matching (assoc base :k3s-version "stable") #":k3s-version")))

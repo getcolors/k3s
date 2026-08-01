@@ -3,6 +3,7 @@ profile: k3s-fixture
 workdir: .colors
 
 provider-compute: hcloud
+provider-dns: no-infra
 provider-backend: local
 compute-prevent-destroy: true
 

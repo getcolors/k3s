@@ -8,6 +8,7 @@ profile: k3s-hetzner
 workdir: .colors
 
 provider-compute: hcloud
+provider-dns: no-infra # or cloudflare
 provider-backend: r2
 compute-prevent-destroy: true
 
@@ -32,6 +33,7 @@ r2-endpoint: https://account.eu.r2.cloudflarestorage.com
 | `profile` | Unique work directory, remote-state prefix, and SSH alias. |
 | `workdir` | Generated root, conventionally `.colors`. |
 | `provider-compute` | `hcloud` in v1. |
+| `provider-dns` | `no-infra`, or `cloudflare` to bootstrap ExternalDNS and cert-manager token Secrets. |
 | `provider-backend` | `local`, `s3`, or `r2`. |
 | `compute-prevent-destroy` | Keep `true`; override through the environment for one delete. |
 | `repository` | Public HTTPS Git URL watched by Flux. |
@@ -54,6 +56,20 @@ Credential: `COLORS_PAR_HCLOUD_TOKEN`.
 The SSH key is an existing Hetzner key name or numeric ID, not key material.
 The package attaches a default-deny inbound firewall allowing ICMP and TCP
 22/80/443. TCP 6443 is deliberately absent.
+
+## Cloudflare DNS and certificates
+
+Set `provider-dns: cloudflare` when the public GitOps repository deploys
+ExternalDNS and cert-manager. Credential:
+`COLORS_PAR_CLOUDFLARE_API_TOKEN`.
+
+During a real create, the package streams this token into identically named
+`cloudflare-api-token` Secrets in the `external-dns` and `cert-manager`
+namespaces. The token is never placed in a rendered file. ExternalDNS and
+cert-manager must reference secret key `api-token`; their Helm releases,
+domain filter, issuer, Ingress hostname, and certificate remain GitOps desired
+state in the public repository. Use a token restricted to Zone Read and DNS
+Edit for the intended zone. `no-infra` creates no namespaces or Secrets.
 
 ## Backends
 

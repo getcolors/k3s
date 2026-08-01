@@ -65,6 +65,51 @@
         --for=condition=Available --timeout=300s
       changed_when: false
 
+    - name: Ensure namespaces for Cloudflare-backed controllers
+      ansible.builtin.command: k3s kubectl apply -f -
+      args:
+        stdin: |
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: cert-manager
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: external-dns
+      register: cloudflare_namespaces
+      changed_when: "'created' in cloudflare_namespaces.stdout"
+      when: '"<{ provider-dns }>" == "cloudflare"'
+
+    - name: Bootstrap Cloudflare API token without writing it to disk
+      ansible.builtin.command: k3s kubectl apply -f -
+      args:
+        stdin: |
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: cloudflare-api-token
+            namespace: cert-manager
+          type: Opaque
+          stringData:
+            api-token: "{{ lookup('ansible.builtin.env', 'COLORS_PAR_CLOUDFLARE_API_TOKEN') }}"
+          ---
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: cloudflare-api-token
+            namespace: external-dns
+          type: Opaque
+          stringData:
+            api-token: "{{ lookup('ansible.builtin.env', 'COLORS_PAR_CLOUDFLARE_API_TOKEN') }}"
+      register: cloudflare_secrets
+      changed_when: >-
+        'created' in cloudflare_secrets.stdout or
+        'configured' in cloudflare_secrets.stdout
+      no_log: true
+      when: '"<{ provider-dns }>" == "cloudflare"'
+
     - name: Copy the desired GitOps source
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/gitops.yml"

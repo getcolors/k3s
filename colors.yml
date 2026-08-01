@@ -3,6 +3,10 @@ profile: k3s-example
 workdir: .colors
 
 provider-compute: hcloud
+# Set to cloudflare when the GitOps repository deploys ExternalDNS and
+# cert-manager. The package then bootstraps their token Secrets without
+# rendering the credential to disk.
+provider-dns: no-infra
 provider-backend: local
 compute-prevent-destroy: true
 

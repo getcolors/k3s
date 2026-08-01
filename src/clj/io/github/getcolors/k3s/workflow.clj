@@ -14,6 +14,7 @@
 (def ^:private defaults
   {:compute-prevent-destroy true
    :provider-compute "hcloud"
+   :provider-dns "no-infra"
    :provider-backend "local"
    :repository-branch "main"
    :repository-path "./k8s"

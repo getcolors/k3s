@@ -5,7 +5,9 @@ A secure single-node K3s server, as a green Package Skill.
 The package provisions one Hetzner Cloud VPS, attaches a firewall exposing only
 SSH and application ports 80/443, installs a pinned K3s and Flux release, and
 points Flux at the public Git repository named by `repository` in `colors.yml`.
-The Kubernetes API on 6443 is not public.
+The Kubernetes API on 6443 is not public. Optional Cloudflare integration
+bootstraps credentials for Flux-deployed ExternalDNS and cert-manager without
+rendering the API token to disk.
 
 ```sh
 ./k3s build                  # render .colors/<profile>/; contacts nothing
