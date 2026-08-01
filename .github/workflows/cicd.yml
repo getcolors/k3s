@@ -10,11 +10,18 @@ permissions:
 
 jobs:
   test:
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          bb: latest
       - name: Unit tests
         run: bb test
       - name: Golden render
@@ -24,7 +31,7 @@ jobs:
 
   tag:
     needs: test
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
