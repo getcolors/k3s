@@ -1,0 +1,25 @@
+# Example desired state. Secret values belong in COLORS_PAR_* variables.
+profile: k3s-example
+workdir: .colors
+
+provider-compute: hcloud
+provider-backend: local
+compute-prevent-destroy: true
+
+repository: https://github.com/getcolors/k3s-helloworld.git
+k3s-version: v1.36.2+k3s1
+flux-version: v2.9.2
+
+hcloud-name: k3s-example
+hcloud-image: ubuntu-24.04
+hcloud-server-type: cx23
+hcloud-location: nbg1
+hcloud-ssh-keys: REPLACE_ME
+
+# For provider-backend: r2
+# r2-bucket: REPLACE_ME
+# r2-endpoint: REPLACE_ME
+
+# For provider-backend: s3
+# s3-bucket: REPLACE_ME
+# s3-region: REPLACE_ME

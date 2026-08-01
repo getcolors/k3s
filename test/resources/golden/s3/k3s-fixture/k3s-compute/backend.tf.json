@@ -1,0 +1,11 @@
+{
+  "terraform" : {
+    "backend" : {
+      "s3" : {
+        "bucket" : "k3s-fixture-state",
+        "key" : "k3s-fixture/k3s-compute.tfstate",
+        "region" : "eu-central-1"
+      }
+    }
+  }
+}

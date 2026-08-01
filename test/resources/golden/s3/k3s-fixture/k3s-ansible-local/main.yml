@@ -1,0 +1,17 @@
+---
+- name: Managed local K3s configuration
+  hosts: local
+  tasks:
+    - name: Manage SSH access for {{ host_alias }}
+      ansible.builtin.blockinfile:
+        path: ~/.ssh/config
+        marker: "# {mark} k3s {{ host_alias }} ANSIBLE MANAGED BLOCK"
+        state: "{{ block_state | default('present') }}"
+        create: yes
+        mode: "0600"
+        block: |
+          Host {{ host_alias }}
+              HostName {{ ip }}
+              User {{ user }}
+              Port 22
+              ForwardAgent no

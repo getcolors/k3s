@@ -1,0 +1,43 @@
+name: Test and Tag
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: [self-hosted, Linux, ARM64]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Unit tests
+        run: bb test
+      - name: Golden render
+        run: bb golden
+      - name: Launcher resolution
+        run: ./scripts/launcher.sh
+
+  tag:
+    needs: test
+    runs-on: [self-hosted, Linux, ARM64]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Create immutable revision tag
+        run: |
+          count=$(git rev-list --count HEAD)
+          tag="1.0.${count}"
+          local_sha=$(git rev-parse HEAD)
+          remote_sha=$(git ls-remote --tags origin "refs/tags/${tag}" | awk '{print $1}')
+          if [ -n "$remote_sha" ]; then
+            [ "$remote_sha" = "$local_sha" ] && exit 0
+            echo "::error::Refusing to move existing tag ${tag}"; exit 1
+          fi
+          git tag "$tag"
+          git push origin "$tag"

@@ -1,0 +1,91 @@
+---
+- name: Install K3s and Flux
+  hosts: k3s
+  become: true
+  tasks:
+    - name: Verify SSH and Python
+      ansible.builtin.ping:
+
+    - name: Install host prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Download the installer from the pinned K3s tag
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/k3s-io/k3s/v1.36.2+k3s1/install.sh"
+        dest: "/usr/local/src/install-k3s-v1.36.2+k3s1"
+        mode: "0755"
+
+    - name: Read the installed K3s version
+      ansible.builtin.command: k3s --version
+      register: installed_k3s
+      changed_when: false
+      failed_when: false
+
+    - name: Install the pinned K3s release
+      ansible.builtin.command: "/usr/local/src/install-k3s-v1.36.2+k3s1"
+      environment:
+        INSTALL_K3S_VERSION: "v1.36.2+k3s1"
+        INSTALL_K3S_EXEC: "server --secrets-encryption"
+      when: installed_k3s.rc != 0 or 'v1.36.2+k3s1' not in installed_k3s.stdout
+
+    - name: Ensure K3s is enabled and running
+      ansible.builtin.systemd_service:
+        name: k3s
+        enabled: true
+        state: started
+
+    - name: Wait for the single node to become Ready
+      ansible.builtin.command: >-
+        k3s kubectl wait node --all
+        --for=condition=Ready --timeout=300s
+      changed_when: false
+
+    - name: Download the pinned Flux install manifest
+      ansible.builtin.get_url:
+        url: "https://github.com/fluxcd/flux2/releases/download/v2.9.2/install.yaml"
+        dest: "/usr/local/src/flux-install-v2.9.2.yaml"
+        mode: "0644"
+
+    - name: Install or update Flux controllers
+      ansible.builtin.command: >-
+        k3s kubectl apply
+        -f /usr/local/src/flux-install-v2.9.2.yaml
+      register: flux_install
+      changed_when: "'created' in flux_install.stdout or 'configured' in flux_install.stdout"
+
+    - name: Wait for Flux controllers
+      ansible.builtin.command: >-
+        k3s kubectl -n flux-system wait deployment --all
+        --for=condition=Available --timeout=300s
+      changed_when: false
+
+    - name: Copy the desired GitOps source
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/gitops.yml"
+        dest: /var/lib/rancher/k3s/server/manifests/colors-gitops.yaml
+        mode: "0644"
+
+    - name: Apply the desired GitOps source immediately
+      ansible.builtin.command: >-
+        k3s kubectl apply
+        -f /var/lib/rancher/k3s/server/manifests/colors-gitops.yaml
+      register: gitops_apply
+      changed_when: "'created' in gitops_apply.stdout or 'configured' in gitops_apply.stdout"
+
+    - name: Wait for Flux to fetch the repository
+      ansible.builtin.command: >-
+        k3s kubectl -n flux-system wait gitrepository/colors-app
+        --for=condition=Ready --timeout=300s
+      changed_when: false
+
+    - name: Wait for Flux to deploy the manifests
+      ansible.builtin.command: >-
+        k3s kubectl -n flux-system wait kustomization/colors-app
+        --for=condition=Ready --timeout=300s
+      changed_when: false

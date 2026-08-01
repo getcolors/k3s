@@ -1,0 +1,28 @@
+{:paths ["test/clj" "test/resources"]
+ :deps {io.github.getcolors/k3s {:local/root "."}}
+ :tasks
+ {test
+  {:doc "Run the test suite under babashka"
+   :requires ([clojure.test :as t]
+              [io.github.getcolors.k3s.validate-test]
+              [io.github.getcolors.k3s.kubectl-test]
+              [io.github.getcolors.k3s.tools-test]
+              [io.github.getcolors.k3s.workflow-test])
+   :task (let [{:keys [fail error]}
+               (t/run-tests 'io.github.getcolors.k3s.validate-test
+                            'io.github.getcolors.k3s.kubectl-test
+                            'io.github.getcolors.k3s.tools-test
+                            'io.github.getcolors.k3s.workflow-test)]
+           (System/exit (if (pos? (+ fail error)) 1 0)))}
+
+  golden
+  {:doc "Render and diff the committed golden output"
+   :task (shell "./scripts/golden.sh")}
+
+  golden:accept
+  {:doc "Regenerate committed golden output after reviewing a change"
+   :task (shell "./scripts/golden.sh" "--accept")}
+
+  pin
+  {:doc "Stamp the bundled launcher with this repository's pushed HEAD"
+   :task (load-file "tasks/pin.clj")}}}

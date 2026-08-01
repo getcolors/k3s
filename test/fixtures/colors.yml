@@ -1,0 +1,22 @@
+# Plausible, fictional desired state for unit and golden builds.
+profile: k3s-fixture
+workdir: .colors
+
+provider-compute: hcloud
+provider-backend: local
+compute-prevent-destroy: true
+
+repository: https://github.com/getcolors/k3s-helloworld.git
+k3s-version: v1.36.2+k3s1
+flux-version: v2.9.2
+
+hcloud-name: k3s-fixture
+hcloud-image: ubuntu-24.04
+hcloud-server-type: cx23
+hcloud-location: nbg1
+hcloud-ssh-keys: fixture-key
+
+s3-bucket: k3s-fixture-state
+s3-region: eu-central-1
+r2-bucket: k3s-fixture-state
+r2-endpoint: https://fixture.eu.r2.cloudflarestorage.com
