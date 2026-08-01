@@ -4,8 +4,8 @@
 
 `k3s` is a green-only Package Skill that provisions one Hetzner Cloud VPS,
 installs K3s and Flux, and reconciles a public Git repository. It ships one
-skill, `package-k3s-green`, and one launcher, `skills/package-k3s-green/k3s`.
-The root `./k3s` is a symlink to that payload.
+skill, `package-k3s-green`, and one launcher, `skills/package-k3s-green/green`.
+The root `./green` is a symlink to that payload.
 
 Read `plans/0001-k3s-v1.md` for the pre-implementation decisions, but treat code
 and tests as authoritative.
@@ -16,8 +16,8 @@ and tests as authoritative.
 bb test
 bb golden
 ./scripts/launcher.sh
-./k3s build
-./k3s create --dry-run
+./green build
+./green create --dry-run
 ```
 
 Never run a real create/delete without explicit authorization. Never edit
@@ -66,7 +66,7 @@ rendered. The local stage owns its SSH block; do not reuse ONCE's local playbook
 - Build and dry-run need no credentials.
 - Real deletion requires `COLORS_PAR_COMPUTE_PREVENT_DESTROY=false` for that
   invocation; do not edit the committed guard.
-- No kubeconfig is written under `.colors`. `./k3s kubectl` invokes the remote
+- No kubeconfig is written under `.colors`. `./green kubectl` invokes the remote
   `k3s kubectl` over SSH.
 - Cloudflare credentials may appear only in process environment and Kubernetes
   Secrets populated through Ansible stdin with `no_log`; never put a plaintext

@@ -10,19 +10,19 @@ bootstraps credentials for Flux-deployed ExternalDNS and cert-manager without
 rendering the API token to disk.
 
 ```sh
-./k3s build                  # render .colors/<profile>/; contacts nothing
-./k3s create --dry-run       # print the graph; touches nothing
-./k3s create                 # provision K3s and reconcile Flux
-./k3s kubectl get nodes      # run kubectl securely over SSH
-./k3s delete                 # protected unless explicitly authorized
+./green build                # render .colors/<profile>/; contacts nothing
+./green create --dry-run     # print the graph; touches nothing
+./green create               # provision K3s and reconcile Flux
+./green kubectl get nodes    # run kubectl securely over SSH
+./green delete               # protected unless explicitly authorized
 ```
 
 ## Install into a project
 
 ```sh
 npx skills add getcolors/k3s
-cp .agents/skills/package-k3s-green/k3s k3s
-chmod +x k3s
+cp .agents/skills/package-k3s-green/green green
+chmod +x green
 ```
 
 The root launcher is a copy. Re-copy it after `npx skills update -p`.

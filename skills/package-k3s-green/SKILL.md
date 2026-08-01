@@ -26,7 +26,7 @@ desired state or performing a real lifecycle operation.
   user's explicit authorization.
 - Keep `compute-prevent-destroy: true`. Authorize one intentional delete with
   `COLORS_PAR_COMPUTE_PREVENT_DESTROY=false` rather than editing desired state.
-- Never open TCP 6443 publicly. `./k3s kubectl` uses SSH.
+- Never open TCP 6443 publicly. `./green kubectl` uses SSH.
 
 ## Requirements
 
@@ -40,18 +40,18 @@ Secrets; the public GitOps repository contains only Secret references.
 ## Commands
 
 ```sh
-./k3s build
-./k3s create --dry-run
-./k3s create
-./k3s kubectl get nodes
-./k3s kubectl get pods -A
-./k3s kubectl apply -f - < manifest.yml
-./k3s delete
+./green build
+./green create --dry-run
+./green create
+./green kubectl get nodes
+./green kubectl get pods -A
+./green kubectl apply -f - < manifest.yml
+./green delete
 ```
 
 ## Initialize in the current directory
 
-1. Copy the `k3s` payload beside this file into the project root and make it
+1. Copy the `green` payload beside this file into the project root and make it
    executable.
 2. Write `colors.yml` from the reference, choosing a unique `profile`.
 3. Require a public HTTPS `repository` containing a `k8s/` Kustomization.
@@ -68,6 +68,6 @@ public IP. A repository may instead deploy ExternalDNS and cert-manager for
 Cloudflare DNS and ACME DNS-01 certificates; the package securely bootstraps
 their token Secrets when `provider-dns: cloudflare`.
 
-`./k3s kubectl` runs the server's `sudo k3s kubectl` through the managed SSH
+`./green kubectl` runs the server's `sudo k3s kubectl` through the managed SSH
 alias. It leaves stdin attached, so local YAML can be streamed with `-f -`.
 No kubeconfig is copied into `.colors`.

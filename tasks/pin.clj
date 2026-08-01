@@ -20,7 +20,7 @@
   The pattern accepts `nil` as well as a SHA: an unpushed repository cannot be
   pinned, so the launcher ships carrying nothing rather than an invented commit,
   and this is what replaces it the first time."
-  {:path "skills/package-k3s-green/k3s"
+  {:path "skills/package-k3s-green/green"
    :rx #"\(def \^:private k3s-sha (nil|\"[0-9a-f]{40}\")\)"})
 
 (defn- git-out

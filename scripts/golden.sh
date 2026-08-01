@@ -15,7 +15,7 @@ build_variant() {
   shift
   (
     cd "$root"
-    env COLORS_PAR_WORKDIR="$tmp/$variant" "$@" bb k3s build -f "$state" >/dev/null
+    env COLORS_PAR_WORKDIR="$tmp/$variant" "$@" bb green build -f "$state" >/dev/null
   )
   if [ "$accept" = 1 ]; then
     rm -rf "${goldens:?}/$variant"
