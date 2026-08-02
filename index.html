@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="A secure single-node K3s server, as a green Package Skill."><title>k3s — Package Skill</title><style>:root{color-scheme:light dark;font:17px/1.6 system-ui,sans-serif}body{max-width:760px;margin:auto;padding:3rem 1.25rem}h1{font-size:clamp(2.5rem,8vw,5rem);margin:.2em 0}a{color:#36a269}code,pre{font-family:ui-monospace,monospace}pre{padding:1rem;overflow:auto;background:#8882;border-radius:.6rem}.tag{font-weight:700;color:#36a269}</style></head><body><main><p class="tag">GREEN PACKAGE SKILL</p><h1>k3s</h1><p>Provision one Hetzner VPS with a restrictive firewall, pinned K3s and Flux releases, and reconciliation from a public Git repository. The Kubernetes API remains private; kubectl runs over managed SSH.</p><pre><code>npx skills add getcolors/k3s
+cp .agents/skills/package-k3s-green/green green
+./green build
+./green create --dry-run
+./green kubectl get nodes</code></pre><p>Optional Cloudflare integration bootstraps ExternalDNS and cert-manager credentials without rendering the token.</p><p><a href="https://github.com/getcolors/k3s">Source and full documentation on GitHub</a></p></main></body></html>
