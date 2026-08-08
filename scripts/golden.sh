@@ -54,7 +54,10 @@ grep -q 'getcolors/k3s-helloworld.git' "$gitops" || {
 grep -q 'path: "./k8s"' "$gitops" || {
   echo 'golden: Flux manifest path moved' >&2; exit 1;
 }
-if rg -q 'client-key-data|client-certificate-data|github_pat_|gho_' "$tmp"; then
+# POSIX grep on purpose. rg is not declared in any toolchain here, and a
+# missing binary inside `if` is simply false — the guard would pass silently on
+# a machine without ripgrep, which is the one case it exists to cover.
+if grep -rEq 'client-key-data|client-certificate-data|BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY|github_pat_|ghp_|gho_|ghu_|ghs_|ghr_' "$tmp"; then
   echo 'golden: a credential-shaped value was rendered' >&2; exit 1
 fi
 
