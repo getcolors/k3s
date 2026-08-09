@@ -5,6 +5,8 @@
    [clojure.java.io :as io]
    [clojure.walk :as walk]
    [green.ansible :as ansible]
+   [green.cli :as green-cli]
+   [green.providers :as provider-ops]
    [green.scaffold :as sc]
    [green.tofu :as tofu]
    [green.workflow :as wf]
@@ -17,18 +19,12 @@
 
 (def ^:private k3s-root "io.github.getcolors.k3s.tools")
 (def ^:private once-root "io.github.getcolors.once.tools")
-(def ^:private raw-template :io.github.getcolors.k3s/raw)
-(def ^:private template-opts
-  {:tag-open \< :tag-close \> :filter-open \{ :filter-close \}})
+(def ^:private template-opts sc/preserve-jinja-delimiters)
 
 (defn tool-dir
   "Resolve a stage beside colors.yml, never relative to the caller."
   [opts tool]
-  (let [workdir (io/file (or (:workdir opts) ".colors"))
-        state-dir (when-not (.isAbsolute workdir)
-                    (some-> (:green/state-file opts) io/file .getAbsoluteFile .getParent))
-        root (if state-dir (io/file state-dir workdir) workdir)]
-    (str (io/file root (or (:profile opts) "k3s") tool))))
+  (green-cli/stage-dir opts tool {:default-profile "k3s"}))
 
 (defn- once-template [tool provider file]
   (keyword (str once-root "." tool "." provider) file))
@@ -40,18 +36,13 @@
   {:template template :target target :data data :opts template-opts})
 
 (defn- raw-spec [target content]
-  (template-spec raw-template target {:content content}))
+  (sc/content-spec target content))
 
 (defn credential-env
   "Provider and backend environment additions, omitting absent credentials."
   [opts & slots]
-  (not-empty
-   (into {}
-         (keep (fn [[k env-var]]
-                 (when-let [v (not-empty (str (get opts k)))]
-                   [env-var v])))
-         (apply merge (map #(validate/tofu-env opts %)
-                           (conj (vec slots) :provider-backend))))))
+  (provider-ops/tool-env validate/providers opts
+                         (conj (vec slots) :provider-backend)))
 
 (defn fallback-compute-params
   "Stand-in values that keep build and dry-run credential-free."

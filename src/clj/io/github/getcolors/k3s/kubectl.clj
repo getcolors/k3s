@@ -8,13 +8,13 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [green.cli :as green-cli]
+   [green.process :as process]
    [io.github.getcolors.k3s.utils :as utils]
    [io.github.getcolors.k3s.validate :as validate]))
 
-(defn shell-quote
+(def shell-quote
   "Quote one remote POSIX-shell argument without allowing command injection."
-  [x]
-  (str "'" (str/replace (str x) "'" "'\\''") "'"))
+  process/posix-quote)
 
 (defn command
   "The local ssh argv for remote `k3s kubectl`."
@@ -24,16 +24,9 @@
                               (concat ["sudo" "-n" "k3s" "kubectl"] args)))]
     ["ssh" "--" (utils/host-alias opts) remote]))
 
-(defn inherit-run
+(def inherit-run
   "Run argv with the caller's terminal streams attached."
-  [argv]
-  (try
-    (let [process (-> (ProcessBuilder. ^java.util.List (mapv str argv))
-                      .inheritIO
-                      .start)]
-      {:exit (.waitFor process)})
-    (catch Exception e
-      {:exit -1 :err (or (.getMessage e) (str (class e)))})))
+  process/run-inherit)
 
 (defn run
   "Read desired state and invoke kubectl through SSH. Returns an outcome map."

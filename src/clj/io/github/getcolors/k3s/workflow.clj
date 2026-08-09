@@ -4,6 +4,7 @@
    [clojure.string :as str]
    [green.cli :as green-cli]
    [green.dry-run :as dry-run]
+   [green.lifecycle :as lifecycle]
    [green.progress :as progress]
    [green.tofu :as tofu]
    [green.workflow :as wf]
@@ -24,23 +25,18 @@
   "Overlay credentials, validate, and guard real destruction."
   ([opts] (start-step opts (System/getenv)))
   ([opts env]
-   (let [opts (green-cli/read-pars (merge defaults opts) env)
-         event (:green/event opts)
-         real? (not (:green/dry-run opts))
-         errors (vec
-                 (concat
-                  (validate/env-errors env)
-                  (validate/state-errors opts)
-                  (when (and real? (lifecycle-events event))
-                    (validate/secret-errors opts))
-                  (when (and real? (= :delete event)
-                             (:compute-prevent-destroy opts))
-                    [(str "compute destruction is protected; set "
-                          (green-cli/par-name :compute-prevent-destroy)
-                          "=false to delete")])))]
-     (if (seq errors)
-       (assoc opts :green/exit 2 :green/err (str/join "\n" errors))
-       (assoc opts :green/exit 0)))))
+   (lifecycle/preflight
+    opts {:defaults defaults :overlay green-cli/read-pars
+          :validators
+          [(fn [_ env _] (validate/env-errors env))
+           (fn [opts _ _] (validate/state-errors opts))
+           (fn [opts _ {:keys [event real?]}]
+             (when (and real? (lifecycle-events event)) (validate/secret-errors opts)))
+           (fn [opts _ {:keys [event real?]}]
+             (when (and real? (= :delete event) (:compute-prevent-destroy opts))
+               [(str "compute destruction is protected; set "
+                     (green-cli/par-name :compute-prevent-destroy) "=false to delete")]))]}
+    env)))
 
 (defn ansible-cleanup-step
   "Remove the SSH block and both rendered Ansible trees before compute destroy."
@@ -66,23 +62,9 @@
 (defn backend-advice
   "Write the selected backend with a package-specific remote state key."
   [tool]
-  (let [dir-fn #(tools/tool-dir % tool)
-        state-key #(str (or (:profile %) "k3s") "/" tool ".tfstate")]
-    (tofu/backends
-     #(or (:provider-backend %) "local")
-     {"local" (tofu/local-backend-advice dir-fn)
-      "s3" (tofu/s3-backend-advice
-            dir-fn
-            (fn [opts]
-              {:bucket (:s3-bucket opts)
-               :key (state-key opts)
-               :region (:s3-region opts)}))
-      "r2" (tofu/r2-backend-advice
-            dir-fn
-            (fn [opts]
-              {:bucket (:r2-bucket opts)
-               :key (state-key opts)
-               :endpoint (:r2-endpoint opts)}))})))
+  (tofu/conventional-backend-advice
+   {:dir-fn #(tools/tool-dir % tool)
+    :key-fn #(str (or (:profile %) "k3s") "/" tool ".tfstate")}))
 
 (def side-effecting-steps
   [:k3s/compute :k3s/ansible-local :k3s/ansible-remote :k3s/ansible-cleanup])
