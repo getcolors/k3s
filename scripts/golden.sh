@@ -14,8 +14,8 @@ build_variant() {
   local variant=$1
   shift
   (
-    cd "$root"
-    env COLORS_PAR_WORKDIR="$tmp/$variant" "$@" bb green build -f "$state" >/dev/null
+    cd "$root/green"
+    env K3S_LIB_ROOT="$root" COLORS_PAR_WORKDIR="$tmp/$variant" "$@" ./green build -f "$state" >/dev/null
   )
   if [ "$accept" = 1 ]; then
     rm -rf "${goldens:?}/$variant"

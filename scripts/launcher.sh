@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The launcher is the one file here that is copied out and run somewhere else,
-# so its interesting behaviour happens in environments this checkout does not
-# contain: no bb.edn beside it, no k3s on the classpath, an unstamped pin.
-# `bb test` cannot reach any of that — it runs inside the checkout, where bb.edn
-# local-roots k3s to the working tree, which is the one path on which none of
-# the resolution logic runs.
+# The launchers are the files here that are copied out and run somewhere else,
+# so their interesting behaviour happens in environments this checkout does not
+# contain: no bb.edn beside them, no k3s on the classpath, an unstamped pin.
+# `bb test` cannot reach any of that — it runs inside the checkout, where
+# green/bb.edn local-roots k3s to the working tree, which is the one path on
+# which none of the resolution logic runs.
 #
 # K3s copies ONCE's launcher pattern deliberately (see plans/0001), and
 # copying the untestable half without its harness would be the wrong half. Every
@@ -49,6 +49,17 @@ done
 ok "carries no step, tofu or ansible logic"
 
 # --------------------------------------------------------------------------
+# Every colour dir symlinks its skill payload.
+
+[[ -L "$root/green/green" && $(readlink "$root/green/green") == ../skills/package-k3s-green/green ]] ||
+  fail "green/green is not the payload symlink"
+[[ -L "$root/red/red" && $(readlink "$root/red/red") == ../skills/package-k3s-red/red ]] ||
+  fail "red/red is not the payload symlink"
+[[ -L "$root/blue/blue" && $(readlink "$root/blue/blue") == ../skills/package-k3s-blue/blue ]] ||
+  fail "blue/blue is not the payload symlink"
+ok "each colour dir symlinks its skill payload"
+
+# --------------------------------------------------------------------------
 # Copied out of the checkout, with nothing to resolve.
 #
 # This is the state a user's project is in before `bb pin` has ever run, and the
@@ -78,7 +89,8 @@ fi
 # K3S_LIB_ROOT overrides whatever is pinned.
 #
 # This is how a copied payload is pointed at a working tree, and how the check
-# above is escaped in a project that has not been able to pin yet.
+# above is escaped in a project that has not been able to pin yet. The
+# convention every colour shares: the override names the repository root.
 
 cat >"$copy/colors.yml" <<'EOF'
 profile: launcher-check
@@ -120,7 +132,7 @@ ok "finds colors.yml by walking up, and renders beside it"
 
 grep -q 'launcher-contract' "$launcher" || fail "the contract handshake is gone"
 lc=$(grep -oE '^\s+[0-9]+\)' <<<"$(grep -A5 'def \^:private launcher-contract' "$launcher")" | grep -oE '[0-9]+' | head -1)
-libc=$(grep -oE '^\s+[0-9]+\)' <<<"$(grep -A8 'def contract' "$root/src/clj/io/github/getcolors/k3s/utils.clj")" | grep -oE '[0-9]+' | head -1)
+libc=$(grep -oE '^\s+[0-9]+\)' <<<"$(grep -A8 'def contract' "$root/green/src/clj/io/github/getcolors/k3s/utils.clj")" | grep -oE '[0-9]+' | head -1)
 [ -n "$lc" ] && [ -n "$libc" ] || fail "could not read both contract numbers"
 [ "$lc" -le "$libc" ] ||
   fail "launcher requires contract $lc but the library provides $libc"
@@ -139,5 +151,22 @@ done
 grep -q 'io.github.getcolors.k3s.kubectl/run' "$launcher" ||
   fail "kubectl no longer dispatches to the tested library namespace"
 ok "every lifecycle and operator command is dispatchable"
+
+# --------------------------------------------------------------------------
+# The red and blue payloads refuse an unpinned standalone copy the same way.
+
+for colour in red blue; do
+  payload="$root/skills/package-k3s-$colour/$colour"
+  if grep -qE '"package-k3s-red": null,|^# dependencies = \[\]$' "$payload"; then
+    cp "$payload" "$tmp/$colour"
+    chmod +x "$tmp/$colour"
+    out=$( (cd "$tmp" && "./$colour" build 2>&1) || true )
+    echo "$out" | grep -q 'K3S_LIB_ROOT' ||
+      fail "an unpinned $colour payload must name K3S_LIB_ROOT; got: $out"
+    ok "an unpinned $colour payload explains itself"
+  else
+    ok "$colour payload is pinned to a real commit"
+  fi
+done
 
 echo "launcher: $checks checks passed"

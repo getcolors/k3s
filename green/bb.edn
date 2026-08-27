@@ -17,12 +17,12 @@
 
   golden
   {:doc "Render and diff the committed golden output"
-   :task (shell "./scripts/golden.sh")}
+   :task (shell "../scripts/golden.sh")}
 
   golden:accept
   {:doc "Regenerate committed golden output after reviewing a change"
-   :task (shell "./scripts/golden.sh" "--accept")}
+   :task (shell "../scripts/golden.sh" "--accept")}
 
   pin
-  {:doc "Stamp the bundled launcher with this repository's pushed HEAD"
+  {:doc "Stamp the three bundled launchers with this repository's pushed HEAD"
    :task (load-file "tasks/pin.clj")}}}

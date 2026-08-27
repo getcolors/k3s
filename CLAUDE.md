@@ -2,33 +2,64 @@
 
 ## What this is
 
-`k3s` is a green-only Package Skill that provisions one Hetzner Cloud VPS,
-installs K3s and Flux, and reconciles a public Git repository. It ships one
-skill, `package-k3s-green`, and one launcher, `skills/package-k3s-green/green`.
-The root `./green` is a symlink to that payload.
+`k3s` is a tri-colour Package Skill (green, red, blue) that provisions one
+Hetzner Cloud VPS, installs K3s and Flux, and reconciles a public Git
+repository. It ships three skills — `package-k3s-green`, `package-k3s-red`,
+and `package-k3s-blue` — each with one launcher under `skills/`.
 
 Read `plans/0001-k3s-v1.md` for the pre-implementation decisions, but treat code
 and tests as authoritative.
 
-## Commands
+## Layout and commands
+
+The three implementations live in the tri-colour layout, matching `netbird` and
+`clickhouse`: canonical Clojure in `green/` (`green/bb.edn`, `green/deps.edn`,
+`green/src/`, `green/tasks/`, tests under `green/test/clj`), TypeScript/Bun in
+`red/`, and Python/uv in `blue/`. Green is canonical: a behavioural change lands
+in all three colours in the same commit and passes `scripts/parity.sh`. The
+fixture and the goldens are shared across colours at the repository root —
+`test/fixtures/` and `test/resources/golden/` — with `green/test/fixtures` and
+`green/test/resources` symlinks pointing at them. Each colour dir holds a
+launcher symlink to its skill payload (`green/green`, `red/red`, `blue/blue`).
 
 ```sh
-bb test
-bb golden
-./scripts/launcher.sh
-./green build
-./green create --dry-run
+cd green && bb test
+cd green && bb golden
+cd green && bb golden:accept   # regenerate after an intended change — read the diff first
+cd red && bun test && bun run typecheck
+cd blue && uv run pytest
+./scripts/parity.sh            # three colours, three state backends, byte for byte
+./scripts/launcher.sh          # from the repository root
+cd green && ./green build
+cd green && ./green create --dry-run
 ```
 
 Never run a real create/delete without explicit authorization. Never edit
 `.colors/`; it is generated output.
 
+## The three-backend golden and parity axis
+
+The goldens have a second axis beside the fixture: the one
+`test/fixtures/colors.yml` is rendered under the **local** state backend, again
+under **r2**, and again under **s3**, produced by overlaying
+`COLORS_PAR_PROVIDER_BACKEND` on the same file. The committed trees live at
+`test/resources/golden/{local,r2,s3}/k3s-fixture/` and differ only in
+`k3s-compute/backend.tf.json`. `scripts/golden.sh` checks green against all
+three; `scripts/parity.sh` renders every variant through every colour and diffs
+the trees — and the colour template trees (`red/resources`, blue's embedded
+`resources/`) — byte for byte.
+
 ## Reuse surface
 
-This package consumes exactly two things from ONCE:
+This package consumes exactly two things from ONCE — in every colour:
 
-1. `io.github.getcolors.once.validate/providers` as data.
-2. `:io.github.getcolors.once.tools.tofu.hcloud/main.tf` as a resource.
+1. ONCE's provider registry as data: green through
+   `io.github.getcolors.once.validate/providers`, red through
+   `package-once-red`, blue through `package_once_blue.validate`.
+2. ONCE's unmodified hcloud compute template: green by classpath keyword
+   (`:io.github.getcolors.once.tools.tofu.hcloud/main.tf`), red by resolving
+   `package-once-red` and reading `red/resources/tools/tofu/hcloud/main.tf`,
+   blue through `importlib.resources` on `package_once_blue`.
 
 Nothing upstream protects this surface. `scripts/golden.sh` is the mitigation.
 It also asserts that ONCE still declares `hcloud_server.node1`, because this
@@ -58,6 +89,24 @@ a Flux GitRepository/Kustomization for `repository`, branch `main`, path
 Kubernetes Secrets for GitOps-managed ExternalDNS and cert-manager; no token is
 rendered. The local stage owns its SSH block; do not reuse ONCE's local playbook.
 
+## Coupling
+
+The package pins Green and ONCE in `green/deps.edn`, the Red SDK and
+`package-once-red` in `red/package.json`, and the Blue SDK and
+`package-once-blue` in `blue/pyproject.toml`. All three colours pin ONCE at the
+**same rev** (`98d3cfa`) — ONCE's own parity is what guarantees its colours
+agree per commit. This package deliberately stays on that older ONCE pin: a
+bump would adopt the SSH-keypair default and churn every golden, and is its own
+change. `blue/pyproject.toml` carries a `[tool.uv] override-dependencies`
+block because `package-once-blue@98d3cfa` pins an older Blue rev
+(`369c5aa`); the override makes this package's Blue pin win.
+
+Use `K3S_LIB_ROOT` (the repository root, for every colour; red also accepts the
+`red/` dir directly), `GREEN_LIB_ROOT`, and `ONCE_LIB_ROOT` for working-tree
+development. Final launchers use a pushed SHA managed by `bb pin` (in
+`green/`), which stamps all three payloads from their unpinned birth forms;
+deployment launchers are copies, not symlinks.
+
 ## Secrets and safety
 
 - Desired-state keys are kebab-case; engine state is namespaced.
@@ -66,12 +115,12 @@ rendered. The local stage owns its SSH block; do not reuse ONCE's local playbook
 - Build and dry-run need no credentials.
 - Real deletion requires `COLORS_PAR_COMPUTE_PREVENT_DESTROY=false` for that
   invocation; do not edit the committed guard.
-- No kubeconfig is written under `.colors`. `./green kubectl` invokes the remote
-  `k3s kubectl` over SSH.
+- No kubeconfig is written under `.colors`. `./green kubectl` (and its red and
+  blue counterparts) invokes the remote `k3s kubectl` over SSH.
 - Cloudflare credentials may appear only in process environment and Kubernetes
   Secrets populated through Ansible stdin with `no_log`; never put a plaintext
   Secret in the public GitOps repository.
-- The launcher contains dependency resolution and dispatch only. Put behaviour
+- The launchers contain dependency resolution and dispatch only. Put behaviour
   in testable library namespaces.
 
 ## Documentation
@@ -86,6 +135,6 @@ paths already encode the repository. Never add one tag without the other.
 
 ## Git
 
-Do not invent or hand-edit `k3s-sha`. After committing and pushing package code,
-run `bb pin`, commit the launcher stamp, and push again. Consumers hold a copy
-of the payload and must re-copy after every update.
+Do not invent or hand-edit any pin. After committing and pushing package code,
+run `bb pin` (in `green/`), commit the launcher stamps, and push again.
+Consumers hold a copy of the payload and must re-copy after every update.

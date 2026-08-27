@@ -11,8 +11,8 @@
 ;; managed ssh alias, and overriding it from the environment can only point
 ;; k3s at another project's state.
 ;;
-;; This file is both the skill payload and the repository entry point — ./green
-;; in the project root is a symlink to it. It deliberately holds no logic of its
+;; This file is both the skill payload and the repository entry point — green/green
+;; in the repository is a symlink to it. It deliberately holds no logic of its
 ;; own: validation, the graph and the steps all live in the `k3s` library,
 ;; where the test suite reaches them. A copied payload is the one place in this
 ;; project where code cannot be tested, so nothing that can live elsewhere
@@ -50,7 +50,7 @@
 ;; cannot resolve its own library says so rather than inventing a SHA or
 ;; silently falling back to whatever is lying around. `bb pin` refuses to stamp
 ;; a dirty or unpushed HEAD for the same reason.
-(def ^:private k3s-sha "46efac41b819e6c19bb4850aba76f3ee9483d7d9")
+(def ^:private k3s-sha nil)
 
 (def ^:private k3s-git-url "https://github.com/getcolors/k3s.git")
 (def ^:private once-git-url "https://github.com/getcolors/once.git")
@@ -59,7 +59,7 @@
 (defn- lib-coord
   [env-var url sha deps-root]
   (if-let [root (System/getenv env-var)]
-    {:local/root root}
+    {:local/root (if deps-root (str (io/file root deps-root)) root)}
     (when sha
       (cond-> {:git/url url :git/sha sha}
         deps-root (assoc :deps/root deps-root)))))
@@ -69,7 +69,7 @@
 
 (def ^:private bootstrap-error
   (when (and (System/getProperty "babashka.version") (not resolved?))
-    (let [k3s (lib-coord "K3S_LIB_ROOT" k3s-git-url k3s-sha nil)
+    (let [k3s (lib-coord "K3S_LIB_ROOT" k3s-git-url k3s-sha "green")
           once (lib-coord "ONCE_LIB_ROOT" once-git-url nil "green")
           green (lib-coord "GREEN_LIB_ROOT" green-git-url nil nil)]
       (if-not k3s
