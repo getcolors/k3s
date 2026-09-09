@@ -4,7 +4,7 @@
 # dependencies = ["package-k3s-blue"]
 #
 # [tool.uv.sources]
-# package-k3s-blue = { git = "https://github.com/getcolors/k3s.git", rev = "55240ad1a9bf526630e8f7922a20d590356a4bdf", subdirectory = "blue" }
+# package-k3s-blue = { git = "https://github.com/getcolors/k3s.git", rev = "866030f314c2bde78f43cb259a0d24a1a06d28d5", subdirectory = "blue" }
 # ///
 #
 # Managed by `bb pin` — do not edit by hand, and never invent a SHA.
