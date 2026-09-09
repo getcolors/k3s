@@ -3,7 +3,9 @@
    [cheshire.core :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
-   [io.github.getcolors.k3s.tools :as tools]))
+   [io.github.getcolors.k3s.tools :as tools]
+   [io.github.getcolors.k3s.machine :as machine]
+   [io.github.getcolors.k3s.validate-test :as vt]))
 
 (defn- temp-dir []
   (let [f (java.io.File/createTempFile "k3s-test-" "")]
@@ -21,13 +23,8 @@
                           :green/state-file "/srv/project/colors.yml"}
                          tools/compute-tool))))
 
-(deftest compute-reuses-once-and-adds-the-firewall
-  (let [specs (tools/compute-specs {:provider-compute "hcloud"} "/w")]
-    (is (= :io.github.getcolors.once.tools.tofu.hcloud/main.tf
-           (:template (first specs))))
-    (is (= :io.github.getcolors.k3s.tools.tofu.hcloud/firewall.tf
-           (:template (second specs))))
-    (is (= "/w/firewall.tf" (:target (second specs))))))
+(deftest compute-keeps-legacy-state-guard
+  (is (= ["k3s-test/k3s-compute.tfstate"] (:legacy_state_keys (machine/requirements vt/base)))))
 
 (deftest inventory-has-one-k3s-host
   (is (= {"all" {"children" {"k3s" {"hosts" {"demo" {"ansible_host" "203.0.113.7"
@@ -53,17 +50,10 @@
     (step merged)
     (tools/tool-dir merged tool)))
 
-(deftest firewall-allows-apps-but-not-the-kubernetes-api
-  (let [dir (temp-dir)
-        opts {:profile "p" :workdir dir :green/event :build
-              :hcloud-name "p" :compute-prevent-destroy true}
-        specs (tools/compute-specs opts (tools/tool-dir opts tools/compute-tool))]
-    ((requiring-resolve 'green.scaffold/scaffold) opts specs)
-    (let [rendered (slurp (str (tools/tool-dir opts tools/compute-tool) "/firewall.tf"))]
-      (doseq [port ["22" "80" "443"]]
-        (is (str/includes? rendered (str "port       = \"" port "\""))))
-      (is (not (str/includes? rendered "port       = \"6443\"")))
-      (is (str/includes? rendered "hcloud_server.node1.id")))))
+(deftest firewall-allows-apps-but-not-kubernetes-api
+  (let [ports (mapv :from_port (filter #(= "tcp" (:protocol %)) (get-in (machine/requirements vt/base) [:security :ingress])))]
+    (is (= [22 80 443] ports))
+    (is (not (some #{6443} ports)))))
 
 (deftest remote-stage-pins-k3s-and-flux-and-renders-gitops
   (let [dir (render-stage tools/ansible-remote-step tools/ansible-remote-tool
@@ -86,7 +76,7 @@
 (deftest local-ssh-config-is-package-owned-and-usable-on-first-connect
   (let [dir (render-stage tools/ansible-local-step tools/ansible-local-tool {})
         rendered (slurp (str dir "/main.yml"))]
-    (is (str/includes? rendered "k3s {{ host_alias }} ANSIBLE MANAGED BLOCK"))
+    (is (str/includes? rendered "Reference copied into package-owned Ansible plays"))
     (is (str/includes? rendered "StrictHostKeyChecking accept-new")
         "kubectl must not fail on the first connection to a newly created host")
     (is (str/includes? rendered "ForwardAgent no"))))

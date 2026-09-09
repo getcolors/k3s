@@ -52,3 +52,8 @@ def test_a_missing_state_file_is_a_usage_failure(tmp_path):
                          lambda _argv: {"exit": 0}, {})
     assert result["blue/exit"] == 2
     assert "desired state file not found" in result["blue/err"]
+
+
+def test_external_private_key_reaches_kubectl():
+    args=kubectl.command({'profile':'p','provider-compute':'hcloud','hcloud-ssh-keys':'existing','ssh-private-key-path':'/tmp/example key'},['get','nodes'])
+    assert args[:4]==['ssh','-i','/tmp/example key','--']

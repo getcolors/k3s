@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, spyOn } from "bun:test";
 import { mkdtempSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,7 @@ import { scaffold } from "red/scaffold";
 import { run as runWorkflow, type Opts } from "red/workflow";
 import * as kubectl from "../src/kubectl.ts";
 import * as tools from "../src/tools.ts";
+import * as machine from "../src/machine.ts";
 import * as utils from "../src/utils.ts";
 import * as validate from "../src/validate.ts";
 import * as workflow from "../src/workflow.ts";
@@ -19,8 +20,10 @@ const base: Opts = {
   workdir: ".colors",
   "provider-compute": "hcloud",
   "provider-dns": "no-infra",
-  "provider-backend": "local",
+  "provider-backend": "s3",
   "compute-prevent-destroy": true,
+  "s3-bucket":"test-state","s3-region":"eu-central-1",
+  "compute-ssh-sources":["0.0.0.0/0"],"compute-http-sources":["0.0.0.0/0"],
   repository: "https://github.com/getcolors/k3s-helloworld.git",
   "k3s-version": "v1.36.2+k3s1",
   "flux-version": "v2.9.2",
@@ -44,21 +47,18 @@ describe("validate", () => {
   test("required values and placeholders are refused", () => {
     const { repository, ...rest } = base;
     expect(matching(rest, /:repository/).length).toBeGreaterThan(0);
-    expect(matching({ ...base, "hcloud-ssh-keys": "REPLACE_ME" }, /:hcloud-ssh-keys/).length)
+    expect(matching({ ...base, "hcloud-ssh-keys": "REPLACE_ME" }, /SSH/).length)
       .toBeGreaterThan(0);
   });
 
-  test("v1 is hcloud only", () => {
-    expect(validate.supportedCompute).toEqual(new Set(["hcloud"]));
-    expect(matching({ ...base, "provider-compute": "digitalocean" }, /supports hcloud only/).length)
-      .toBeGreaterThan(0);
-    expect(matching({ ...base, "provider-compute": "azure" }, /unsupported :provider-compute/).length)
-      .toBeGreaterThan(0);
+  test("compute selections are validated by the library",()=>{
+    expect(validate.stateErrors({...base,"provider-compute":"no-infra"}).length).toBeGreaterThan(0);
+    expect(validate.stateErrors({...base,"provider-backend":"local"}).length).toBeGreaterThan(0);
   });
 
   test("providers come from ONCE's registry", () => {
-    expect(validate.slots).toEqual(["provider-compute", "provider-dns", "provider-backend"]);
-    expect(matching({ ...base, "provider-backend": "gcs" }, /unsupported :provider-backend/).length)
+    expect(validate.slots).toEqual(["provider-dns"]);
+    expect(matching({ ...base, "provider-backend": "gcs" }, /provider-backend/).length)
       .toBeGreaterThan(0);
     const r2 = {
       ...base, "provider-backend": "r2",
@@ -170,13 +170,8 @@ describe("tools", () => {
     }, tools.computeTool)).toBe("/srv/project/.colors/p/k3s-compute");
   });
 
-  test("compute reuses ONCE and adds the firewall", () => {
-    const specs = tools.computeSpecs({ "provider-compute": "hcloud" }, "/w");
-    expect((specs[0]!.template as { name: string }).name).toBe("once/tools/tofu/hcloud/main.tf");
-    expect((specs[0]!.template as { content: string }).content)
-      .toContain('resource "hcloud_server" "node1"');
-    expect((specs[1]!.template as { name: string }).name).toBe("tofu/hcloud/firewall.tf");
-    expect(specs[1]!.target).toBe("/w/firewall.tf");
+  test("compute keeps the legacy state guard",()=>{
+    expect(machine.requirements(base).legacy_state_keys).toEqual(['k3s-test/k3s-compute.tfstate']);
   });
 
   test("inventory has one k3s host", () => {
@@ -196,19 +191,9 @@ describe("tools", () => {
     expect(data.ip).toBeDefined();
   });
 
-  test("firewall allows apps but not the Kubernetes API", async () => {
-    const dir = tempDir();
-    const opts: Opts = {
-      profile: "p", workdir: dir, "red/event": "build",
-      "hcloud-name": "p", "compute-prevent-destroy": true,
-    };
-    scaffold(opts, tools.computeSpecs(opts, tools.toolDir(opts, tools.computeTool)));
-    const rendered = await Bun.file(join(tools.toolDir(opts, tools.computeTool), "firewall.tf")).text();
-    for (const port of ["22", "80", "443"]) {
-      expect(rendered).toContain(`port       = "${port}"`);
-    }
-    expect(rendered).not.toContain('port       = "6443"');
-    expect(rendered).toContain("hcloud_server.node1.id");
+  test("firewall allows apps but not the Kubernetes API",()=>{
+    const ports=machine.requirements(base).security.ingress.filter(rule=>rule.protocol==="tcp").map(rule=>rule.from_port);
+    expect(ports).toEqual([22,80,443]);expect(ports).not.toContain(6443);
   });
 
   async function renderStage(step: (opts: Opts) => Promise<Opts>, tool: string, opts: Opts): Promise<string> {
@@ -245,7 +230,7 @@ describe("tools", () => {
   test("local ssh config is package owned and usable on first connect", async () => {
     const dir = await renderStage(tools.ansibleLocalStep, tools.ansibleLocalTool, {});
     const rendered = await Bun.file(join(dir, "main.yml")).text();
-    expect(rendered).toContain("k3s {{ host_alias }} ANSIBLE MANAGED BLOCK");
+    expect(rendered).toContain("Reference copied into package-owned Ansible plays");
     expect(rendered).toContain("StrictHostKeyChecking accept-new");
     expect(rendered).toContain("ForwardAgent no");
   });
@@ -290,11 +275,15 @@ describe("workflow", () => {
     expect((await start({ ...base, "red/event": "create", "red/dry-run": true }))["red/exit"]).toBe(0);
   });
 
-  test("delete guard is lifted only for one environment", async () => {
-    const token = { COLORS_PAR_HCLOUD_TOKEN: "token" };
-    expect((await start({ ...base, "red/event": "delete" }, token))["red/exit"]).toBe(2);
-    expect((await start({ ...base, "red/event": "delete" },
-      { ...token, COLORS_PAR_COMPUTE_PREVENT_DESTROY: "false" }))["red/exit"]).toBe(0);
+  test("delete requires owned inventory after the guard is lifted",async()=>{
+    const reader=spyOn(machine,'load').mockResolvedValue({'red/exit':1,'red/err':'missing inventory'});
+    try {
+      const token={COLORS_PAR_HCLOUD_TOKEN:'token'};
+      expect((await start({...base,'red/event':'delete'},token))['red/exit']).toBe(2);
+      expect(reader).not.toHaveBeenCalled();
+      expect((await start({...base,'red/event':'delete'},{...token,COLORS_PAR_COMPUTE_PREVENT_DESTROY:'false'}))['red/exit']).toBe(1);
+      expect(reader).toHaveBeenCalledTimes(1);
+    } finally { reader.mockRestore(); }
   });
 
   test("profile overlay stops before rendering", async () => {
@@ -304,17 +293,10 @@ describe("workflow", () => {
     expect(String(result["red/err"])).toContain("COLORS_PAR_PROFILE");
   });
 
-  test("state key is profile plus k3s stage", async () => {
-    const advice = workflow.backendAdvice(tools.computeTool);
-    const result = await advice({
-      "provider-backend": "r2", profile: "k3s-hetzner",
-      workdir: tempDir(),
-      "r2-bucket": "shared", "r2-endpoint": "https://r2.example",
-    });
-    const backend = await Bun.file(
-      join(tools.toolDir(result, tools.computeTool), "backend.tf.json")).text();
-    expect(backend).toContain("k3s-hetzner/k3s-compute.tfstate");
-    expect(backend).not.toContain("tofu-compute.tfstate");
+  test("state key is library owned",async()=>{
+    const opts={...base,'red/event':'build',workdir:tempDir()};await machine.step(opts);
+    const backend=await Bun.file(join(tools.toolDir(opts,tools.computeTool),'shared/backend.tf.json')).text();
+    expect(backend).toContain('compute');expect(backend).not.toContain('k3s-compute.tfstate');
   });
 
   test("whole build renders every stage", async () => {
@@ -323,9 +305,8 @@ describe("workflow", () => {
       { ...base, "red/event": "build", workdir: dir, profile: "built" });
     expect(result["red/exit"]).toBe(0);
     for (const file of [
-      "k3s-compute/main.tf",
-      "k3s-compute/firewall.tf",
-      "k3s-compute/backend.tf.json",
+      "k3s-compute/shared/backend.tf.json",
+      "k3s-compute/nodes/0/node-none.tf.json",
       "k3s-ansible-local/main.yml",
       "k3s-ansible-local/inventory.ini",
       "k3s-ansible-remote/main.yml",
@@ -343,4 +324,9 @@ describe("workflow", () => {
     expect(result["red/exit"]).toBe(0);
     expect(readdirSync(dir)).toEqual([]);
   });
+});
+
+test('external private key reaches kubectl',()=>{
+ const args=kubectl.command({profile:'p','provider-compute':'hcloud','hcloud-ssh-keys':'existing','ssh-private-key-path':'/tmp/example key'},['get','nodes']);
+ expect(args.slice(0,4)).toEqual(['ssh','-i','/tmp/example key','--']);
 });

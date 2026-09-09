@@ -11,6 +11,7 @@ import * as tofu from "red/tofu";
 import type { Opts } from "red/workflow";
 import { StepError, failed } from "red/workflow";
 import * as utils from "./utils.ts";
+import * as machine from "./machine.ts";
 import * as validate from "./validate.ts";
 
 import ansibleLocalCfg from "../resources/tools/ansible-local/ansible.cfg" with { type: "text" };
@@ -19,7 +20,6 @@ import ansibleLocalMain from "../resources/tools/ansible-local/main.yml" with { 
 import ansibleRemoteCfg from "../resources/tools/ansible-remote/ansible.cfg" with { type: "text" };
 import ansibleRemoteGitops from "../resources/tools/ansible-remote/gitops.yml" with { type: "text" };
 import ansibleRemoteMain from "../resources/tools/ansible-remote/main.yml" with { type: "text" };
-import tofuHcloudFirewallTf from "../resources/tools/tofu/hcloud/firewall.tf" with { type: "text" };
 
 export const computeTool = "k3s-compute";
 export const ansibleLocalTool = "k3s-ansible-local";
@@ -41,7 +41,6 @@ const templates: Record<string, string> = {
   "ansible-remote/ansible.cfg": ansibleRemoteCfg,
   "ansible-remote/gitops.yml": ansibleRemoteGitops,
   "ansible-remote/main.yml": ansibleRemoteMain,
-  "tofu/hcloud/firewall.tf": tofuHcloudFirewallTf,
 };
 
 export function template(path: string, file: string): Template {
@@ -53,12 +52,6 @@ export function template(path: string, file: string): Template {
 
 // ONCE's unmodified Hetzner compute template, resolved from the installed
 // package the way the clickhouse package resolves ONCE's compute template.
-export function onceTemplate(provider: string): Template {
-  const entry = Bun.resolveSync("package-once-red", import.meta.dir);
-  const path = join(dirname(entry), `../resources/tools/tofu/${provider}/main.tf`);
-  return { name: `once/tools/tofu/${provider}/main.tf`, content: readFileSync(path, "utf8") };
-}
-
 function spec(source: Template, target: string, data: Opts): Spec {
   return { template: source, target, data, opts: templateOpts };
 }
@@ -66,49 +59,8 @@ function spec(source: Template, target: string, data: Opts): Spec {
 const rawSpec = (target: string, content: string): Spec => contentSpec(target, content);
 
 // Provider and backend environment additions, omitting absent credentials.
-export function credentialEnv(opts: Opts, ...slots: string[]): Record<string, string> | undefined {
-  return toolEnv(validate.providers, opts, [...slots, "provider-backend"]);
-}
-
-// Stand-in values that keep build and dry-run credential-free.
-export function fallbackComputeParams(opts: Opts): Opts {
-  return {
-    ip: "192.168.0.1",
-    sudoer: "root",
-    name: opts.profile ?? "k3s",
-    user: "root",
-  };
-}
-
-// ONCE's hcloud server plus this package's firewall and attachment.
-export function computeSpecs(opts: Opts, dir: string): Spec[] {
-  return [
-    spec(onceTemplate("hcloud"), `${dir}/main.tf`, opts),
-    spec(template("tofu.hcloud", "firewall.tf"), `${dir}/firewall.tf`, opts),
-  ];
-}
-
-function outputParams(opts: Opts): Opts | undefined {
-  const outputs = opts["tofu/outputs"] as Record<string, unknown> | undefined;
-  return outputs?.params as Opts | undefined;
-}
-
-// Render/apply compute, then adopt the server address for both Ansible stages.
-export async function computeStep(opts: Opts): Promise<Opts> {
-  const dir = toolDir(opts, computeTool);
-  const fallback = fallbackComputeParams(opts);
-  const result = await tofu.tofuWithSpec(opts, computeSpecs(opts, dir), {
-    dir,
-    env: credentialEnv(opts, "provider-compute"),
-  });
-  if (failed(result)) return result;
-  if (opts["red/event"] === "build") {
-    return { ...result, ...fallback, "k3s/compute-params": fallback };
-  }
-  if (opts["red/event"] === "delete") return result;
-  const params = { ...fallback, ...(outputParams(result) ?? {}) };
-  return { ...result, ...params, "k3s/compute-params": params };
-}
+export const fallbackComputeParams=machine.fallbackParams;
+export const computeStep=machine.step;
 
 // Java's Double.toString, which is what Cheshire renders floats through and
 // therefore what green's committed inventory bytes would carry. Integral
@@ -163,7 +115,7 @@ export function inventory(opts: Opts): string {
       children: {
         k3s: {
           hosts: {
-            [alias]: { ansible_host: opts.ip, ansible_user: opts.user },
+            [alias]: { ansible_host: opts.ip, ansible_user: opts.user, ...(opts["ssh-private-key-path"]?{ansible_ssh_private_key_file:opts["ssh-private-key-path"]}:{}) },
           },
         },
       },
@@ -180,7 +132,7 @@ function notEmpty(value: unknown): string | undefined {
 export function dataFn(opts: Opts): Opts {
   return {
     ...opts,
-    ip: notEmpty(opts.ip) ?? "192.168.0.1",
+    ip: notEmpty(opts.ip) ?? "",
     user: notEmpty(opts.user) ?? "root",
     "host-alias": utils.hostAlias(opts),
     "provider-dns": notEmpty(opts["provider-dns"]) ?? "no-infra",
@@ -204,9 +156,9 @@ export async function ansibleLocalStep(opts: Opts): Promise<Opts> {
     inventory: "inventory.ini",
     playbooks: { create: "main.yml", delete: "main.yml" },
     extraVars: {
+      ssh_legacy_marker_prefix: "k3s",
       host_alias: data["host-alias"],
-      ip: data.ip,
-      user: data.user,
+      ssh_hosts:[{name:data["host-alias"],ip:data.ip,user:data.user,identity_file:opts["ssh-private-key-path"]??null}],
       block_state: isDelete ? "absent" : "present",
     },
   }, specs);

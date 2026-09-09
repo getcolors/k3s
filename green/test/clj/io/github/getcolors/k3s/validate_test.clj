@@ -9,8 +9,10 @@
    :workdir ".colors"
    :provider-compute "hcloud"
    :provider-dns "no-infra"
-   :provider-backend "local"
+   :provider-backend "s3"
    :compute-prevent-destroy true
+   :s3-bucket "test-state" :s3-region "eu-central-1"
+   :compute-ssh-sources ["0.0.0.0/0"] :compute-http-sources ["0.0.0.0/0"]
    :repository "https://github.com/getcolors/k3s-helloworld.git"
    :k3s-version "v1.36.2+k3s1"
    :flux-version "v2.9.2"
@@ -28,19 +30,16 @@
 
 (deftest required-values-and-placeholders-are-refused
   (is (seq (matching (dissoc base :repository) #":repository")))
-  (is (seq (matching (assoc base :hcloud-ssh-keys "REPLACE_ME") #":hcloud-ssh-keys"))))
+  (is (seq (matching (assoc base :hcloud-ssh-keys "REPLACE_ME") #"SSH"))))
 
-(deftest v1-is-hcloud-only
-  (is (= #{"hcloud"} validate/supported-compute))
-  (is (seq (matching (assoc base :provider-compute "digitalocean")
-                     #"supports hcloud only")))
-  (is (seq (matching (assoc base :provider-compute "azure")
-                     #"unsupported :provider-compute"))))
+(deftest library-validates-compute-selections
+  (is (seq (validate/state-errors (assoc base :provider-compute "no-infra"))))
+  (is (seq (validate/state-errors (assoc base :provider-backend "local")))) )
 
 (deftest providers-come-from-onces-registry
-  (is (= [:provider-compute :provider-dns :provider-backend] validate/slots))
+  (is (= [:provider-dns] validate/slots))
   (is (seq (matching (assoc base :provider-backend "gcs")
-                     #"unsupported :provider-backend")))
+                     #"provider-backend")))
   (let [r2 (assoc base :provider-backend "r2"
                   :r2-bucket "b" :r2-endpoint "https://r2.example"
                   :hcloud-token "token")]

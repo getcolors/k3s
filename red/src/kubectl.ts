@@ -12,6 +12,7 @@ import { posixQuote, runInherit } from "red/process";
 import type { ExecResult } from "red/runtime";
 import type { Opts } from "red/workflow";
 import * as utils from "./utils.ts";
+import {keyMode} from "colors-compute-red";
 import * as validate from "./validate.ts";
 
 // Quote one remote POSIX-shell argument without allowing command injection.
@@ -20,7 +21,8 @@ export const shellQuote = posixQuote;
 // The local ssh argv for remote `k3s kubectl`.
 export function command(opts: Opts, args: string[]): string[] {
   const remote = ["sudo", "-n", "k3s", "kubectl", ...args].map(shellQuote).join(" ");
-  return ["ssh", "--", utils.hostAlias(opts), remote];
+  const identity=keyMode({"provider-compute":"hcloud",...opts}).private_key_path;
+  return ["ssh", ...(identity?["-i",String(identity)]:[]), "--", utils.hostAlias(opts), remote];
 }
 
 // Run argv with the caller's terminal streams attached.

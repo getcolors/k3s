@@ -4,7 +4,7 @@ io.github.getcolors.k3s.utils."""
 from __future__ import annotations
 
 # Bump on any change a launcher pinned to an older commit could not survive.
-CONTRACT = 1
+CONTRACT = 2
 
 
 def host_alias(opts: dict) -> str:

@@ -3,7 +3,7 @@
 
 (def contract
   "Minimum interface version required by the bundled launcher."
-  1)
+  2)
 
 (defn host-alias
   "The managed SSH alias, derived from the project profile."

@@ -8,6 +8,7 @@ import * as progress from "red/progress";
 import * as tofu from "red/tofu";
 import { adviceAdd, workflow, type Opts, type WireDecl } from "red/workflow";
 import * as tools from "./tools.ts";
+import * as machine from "./machine.ts";
 import * as validate from "./validate.ts";
 
 const lifecycleEvents = ["create", "delete"];
@@ -16,7 +17,7 @@ export const defaults: Opts = {
   "compute-prevent-destroy": true,
   "provider-compute": "hcloud",
   "provider-dns": "no-infra",
-  "provider-backend": "local",
+  "provider-backend": "r2",
   "repository-branch": "main",
   "repository-path": "./k8s",
   workdir: ".colors",
@@ -42,12 +43,14 @@ export async function startStep(
           ? [`compute destruction is protected; set ${parName("compute-prevent-destroy")}=false to delete`]
           : [],
     ],
+    afterValidate:(o,e,c)=>c.real&&c.event==="delete"?machine.load(o,e):{...o,"red/exit":0},
   }, env);
 }
 
 // Remove the SSH block and both rendered Ansible trees before compute destroy.
 export async function ansibleCleanupStep(opts: Opts): Promise<Opts> {
-  return tools.ansibleRemoteStep(await tools.ansibleLocalStep(opts));
+  const result=await tools.ansibleLocalStep(opts);
+  return result["red/exit"]?result:tools.ansibleRemoteStep(result);
 }
 
 export function wireFn(step: string, runOpts: Opts): WireDecl | undefined {
@@ -70,21 +73,12 @@ export function wireFn(step: string, runOpts: Opts): WireDecl | undefined {
 }
 
 // Write the selected backend with a package-specific remote state key.
-export function backendAdvice(tool: string) {
-  return tofu.conventionalBackendAdvice({
-    dir: (opts) => tools.toolDir(opts, tool),
-    key: (opts) => `${opts.profile ?? "k3s"}/${tool}.tfstate`,
-  });
-}
-
 export const sideEffectingSteps = [
   "k3s/compute", "k3s/ansible-local", "k3s/ansible-remote", "k3s/ansible-cleanup",
 ];
 
 function create() {
   let wf = workflow({ start: "k3s/start", wireFn });
-  wf = adviceAdd(wf, "k3s/compute", "before",
-    "io.github.getcolors.k3s.workflow/backend", backendAdvice(tools.computeTool));
   wf = progress.advise(wf);
   wf = dryRun.advise(wf, sideEffectingSteps);
   return wf;

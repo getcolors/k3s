@@ -5,8 +5,10 @@ base = {
     "workdir": ".colors",
     "provider-compute": "hcloud",
     "provider-dns": "no-infra",
-    "provider-backend": "local",
+    "provider-backend": "s3",
     "compute-prevent-destroy": True,
+    "s3-bucket":"test-state","s3-region":"eu-central-1",
+    "compute-ssh-sources":["0.0.0.0/0"],"compute-http-sources":["0.0.0.0/0"],
     "repository": "https://github.com/getcolors/k3s-helloworld.git",
     "k3s-version": "v1.36.2+k3s1",
     "flux-version": "v2.9.2",
@@ -28,18 +30,16 @@ def test_complete_state_is_renderable():
 
 def test_required_values_and_placeholders_are_refused():
     assert matching({k: v for k, v in base.items() if k != "repository"}, ":repository")
-    assert matching({**base, "hcloud-ssh-keys": "REPLACE_ME"}, ":hcloud-ssh-keys")
+    assert matching({**base, "hcloud-ssh-keys": "REPLACE_ME"}, "SSH")
 
 
-def test_v1_is_hcloud_only():
-    assert validate.supported_compute == {"hcloud"}
-    assert matching({**base, "provider-compute": "digitalocean"}, "supports hcloud only")
-    assert matching({**base, "provider-compute": "azure"}, "unsupported :provider-compute")
-
+def test_compute_selection_is_validated_by_library():
+    assert validate.state_errors({**base,"provider-compute":"no-infra"})
+    assert validate.state_errors({**base,"provider-backend":"local"})
 
 def test_providers_come_from_onces_registry():
-    assert validate.slots == ["provider-compute", "provider-dns", "provider-backend"]
-    assert matching({**base, "provider-backend": "gcs"}, "unsupported :provider-backend")
+    assert validate.slots == ["provider-dns"]
+    assert matching({**base, "provider-backend": "gcs"}, "provider-backend")
     r2 = {**base, "provider-backend": "r2",
           "r2-bucket": "b", "r2-endpoint": "https://r2.example",
           "hcloud-token": "token"}

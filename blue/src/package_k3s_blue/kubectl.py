@@ -14,6 +14,7 @@ from blue.cli import load_yaml, read_pars
 from blue.process import posix_quote, run_inherit
 
 from . import utils, validate
+from colors_compute.ssh import _mode
 
 # Quote one remote POSIX-shell argument without allowing command injection.
 shell_quote = posix_quote
@@ -23,7 +24,9 @@ def command(opts: dict, args: list[str]) -> list[str]:
     """The local ssh argv for remote `k3s kubectl`."""
     remote = " ".join(shell_quote(arg)
                       for arg in ["sudo", "-n", "k3s", "kubectl", *args])
-    return ["ssh", "--", utils.host_alias(opts), remote]
+    mode=_mode({"provider-compute":"hcloud",**opts})
+    identity=mode.get("private_key_path")
+    return ["ssh", *(["-i",identity] if identity else []), "--", utils.host_alias(opts), remote]
 
 
 # Run argv with the caller's terminal streams attached.

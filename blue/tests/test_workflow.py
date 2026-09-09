@@ -1,7 +1,8 @@
 import os
 
 from blue.workflow import run as run_workflow
-from package_k3s_blue import tools, workflow
+from package_k3s_blue import tools, workflow, machine
+from unittest.mock import AsyncMock
 
 from test_validate import base
 
@@ -44,12 +45,13 @@ async def test_dry_run_needs_no_credentials():
                          "blue/dry-run": True}))["blue/exit"] == 0
 
 
-async def test_delete_guard_is_lifted_only_for_one_environment():
+async def test_delete_guard_is_lifted_only_for_one_environment(monkeypatch):
+    monkeypatch.setattr(machine,"load",AsyncMock(return_value={"blue/exit":1,"blue/err":"missing inventory"}))
     token = {"COLORS_PAR_HCLOUD_TOKEN": "token"}
     assert (await start({**base, "blue/event": "delete"}, token))["blue/exit"] == 2
     assert (await start({**base, "blue/event": "delete"},
                         {**token, "COLORS_PAR_COMPUTE_PREVENT_DESTROY": "false"})
-            )["blue/exit"] == 0
+            )["blue/exit"] == 1
 
 
 async def test_profile_overlay_stops_before_rendering():
@@ -59,24 +61,20 @@ async def test_profile_overlay_stops_before_rendering():
     assert "COLORS_PAR_PROFILE" in result["blue/err"]
 
 
-async def test_state_key_is_profile_plus_k3s_stage(tmp_path):
-    advice = workflow.backend_advice(tools.compute_tool)
-    result = advice({"provider-backend": "r2", "profile": "k3s-hetzner",
-                     "workdir": str(tmp_path),
-                     "r2-bucket": "shared", "r2-endpoint": "https://r2.example"})
-    backend = open(f"{tools.tool_dir(result, tools.compute_tool)}/backend.tf.json").read()
-    assert "k3s-hetzner/k3s-compute.tfstate" in backend
-    assert "tofu-compute.tfstate" not in backend
-
+async def test_state_key_is_library_owned(tmp_path):
+    opts={**base,"blue/event":"build","workdir":str(tmp_path)}
+    await machine.step(opts)
+    backend=(tmp_path/base['profile']/"k3s-compute/shared/backend.tf.json").read_text()
+    assert 'compute' in backend
+    assert 'k3s-compute.tfstate' not in backend
 
 async def test_whole_build_renders_every_stage(tmp_path):
     result = await run_workflow(workflow.k3s_workflow,
                                 {**base, "blue/event": "build",
                                  "workdir": str(tmp_path), "profile": "built"})
     assert result["blue/exit"] == 0
-    for file in ["k3s-compute/main.tf",
-                 "k3s-compute/firewall.tf",
-                 "k3s-compute/backend.tf.json",
+    for file in ["k3s-compute/shared/backend.tf.json",
+                 "k3s-compute/nodes/0/node-none.tf.json",
                  "k3s-ansible-local/main.yml",
                  "k3s-ansible-local/inventory.ini",
                  "k3s-ansible-remote/main.yml",

@@ -8,14 +8,14 @@ from blue.cli import par_name, read_pars
 from blue.lifecycle import preflight
 from blue.workflow import advice_add, workflow
 
-from . import tools, validate
+from . import tools, validate, machine
 
 LIFECYCLE_EVENTS = ("create", "delete")
 
 DEFAULTS = {"compute-prevent-destroy": True,
             "provider-compute": "hcloud",
             "provider-dns": "no-infra",
-            "provider-backend": "local",
+            "provider-backend": "r2",
             "repository-branch": "main",
             "repository-path": "./k8s",
             "workdir": ".colors"}
@@ -34,13 +34,14 @@ async def start_step(opts: dict, env: dict | None = None) -> dict:
                                f"{par_name('compute-prevent-destroy')}=false to delete"]
                               if c["real"] and c["event"] == "delete"
                               and o.get("compute-prevent-destroy") else []),
-        ])
+        ], after_validate=lambda o,e,c: machine.load(o,e) if c["real"] and c["event"]=="delete" else {**o,"blue/exit":0})
 
 
 async def ansible_cleanup_step(opts: dict) -> dict:
     """Remove the SSH block and both rendered Ansible trees before compute
     destroy."""
-    return await tools.ansible_remote_step(await tools.ansible_local_step(opts))
+    result=await tools.ansible_local_step(opts)
+    return result if result.get("blue/exit") else await tools.ansible_remote_step(result)
 
 
 def wire_fn(step: str, run_opts: dict):
@@ -59,22 +60,12 @@ def wire_fn(step: str, run_opts: dict):
     }.get(step)
 
 
-def backend_advice(tool: str):
-    """Write the selected backend with a package-specific remote state key."""
-    return tofu.conventional_backend_advice(
-        dir=lambda o, tool=tool: tools.tool_dir(o, tool),
-        key=lambda o, tool=tool: f"{o.get('profile') or 'k3s'}/{tool}.tfstate")
-
-
 side_effecting_steps = ["k3s/compute", "k3s/ansible-local",
                         "k3s/ansible-remote", "k3s/ansible-cleanup"]
 
 
 def create_workflow():
     wf = workflow(start="k3s/start", wire_fn=wire_fn)
-    wf = advice_add(wf, "k3s/compute", "before",
-                    "io.github.getcolors.k3s.workflow/backend",
-                    backend_advice(tools.compute_tool))
     wf = progress.advise(wf)
     wf = dry_run.advise(wf, side_effecting_steps)
     return wf

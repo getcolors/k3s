@@ -19,18 +19,8 @@
 
 (def blue-unpinned-meta "# dependencies = []\n# ///")
 (defn blue-pinned-meta [sha]
-  (str "# dependencies = [\"package-k3s-blue\", \"blue\", \"package-once-blue\"]\n"
-       "#\n"
-       "# [tool.uv.sources]\n"
-       "# package-k3s-blue = { git = \"https://github.com/getcolors/k3s.git\", rev = \"" sha "\", subdirectory = \"blue\" }\n"
-       "# blue = { git = \"https://github.com/getcolors/blue.git\", rev = \"290f313ead5ca162875c33a049c880da017eae09\" }\n"
-       "# package-once-blue = { git = \"https://github.com/getcolors/once.git\", subdirectory = \"blue\", rev = \"98d3cfa2c743b89a72bac0252c258f9edeedcad7\" }\n"
-       "#\n"
-       ;; package-once-blue carries its own, older blue pin; the override makes
-       ;; this package's blue pin win, as it does in blue/pyproject.toml.
-       "# [tool.uv]\n"
-       "# override-dependencies = [\"blue @ git+https://github.com/getcolors/blue.git@290f313ead5ca162875c33a049c880da017eae09\"]\n"
-       "# ///"))
+  (str "# dependencies = [\"package-k3s-blue\"]\n#\n# [tool.uv.sources]\n"
+       "# package-k3s-blue = { git = \"https://github.com/getcolors/k3s.git\", rev = \"" sha "\", subdirectory = \"blue\" }\n# ///"))
 (defn stamp-blue [s sha]
   ;; First stamp is structural: the metadata block gains its git sources and the
   ;; UNPINNED paragraph collapses to a pinned-state note. Re-pinning is a SHA swap.

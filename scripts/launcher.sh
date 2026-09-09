@@ -92,25 +92,12 @@ fi
 # above is escaped in a project that has not been able to pin yet. The
 # convention every colour shares: the override names the repository root.
 
-cat >"$copy/colors.yml" <<'EOF'
-profile: launcher-check
-workdir: .colors
-provider-compute: hcloud
-provider-backend: local
-compute-prevent-destroy: true
-repository: https://github.com/getcolors/k3s-helloworld.git
-k3s-version: v1.36.2+k3s1
-flux-version: v2.9.2
-hcloud-name: launcher-check
-hcloud-image: ubuntu-24.04
-hcloud-server-type: cx23
-hcloud-location: nbg1
-hcloud-ssh-keys: fixture-key
-EOF
+cp "$root/test/fixtures/colors.yml" "$copy/colors.yml"
+sed -i 's/profile: k3s-fixture/profile: launcher-check/' "$copy/colors.yml"
 
 out=$( (cd "$copy" && K3S_LIB_ROOT="$root" ./green build 2>&1) ) ||
   fail "K3S_LIB_ROOT did not resolve the working tree: $out"
-[ -f "$copy/.colors/launcher-check/k3s-compute/main.tf" ] ||
+[ -f "$copy/.colors/launcher-check/k3s-compute/shared/backend.tf.json" ] ||
   fail "the override resolved but rendered nothing"
 ok "K3S_LIB_ROOT resolves a working tree from a copied payload"
 
@@ -123,7 +110,7 @@ ok "K3S_LIB_ROOT resolves a working tree from a copied payload"
 mkdir -p "$copy/deep/nested"
 out=$( (cd "$copy/deep/nested" && K3S_LIB_ROOT="$root" ./../../green build 2>&1) ) ||
   fail "running from a subdirectory failed: $out"
-[ -f "$copy/.colors/launcher-check/k3s-compute/main.tf" ] ||
+[ -f "$copy/.colors/launcher-check/k3s-compute/shared/backend.tf.json" ] ||
   fail "a subdirectory run rendered somewhere other than beside colors.yml"
 ok "finds colors.yml by walking up, and renders beside it"
 

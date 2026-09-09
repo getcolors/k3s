@@ -11,13 +11,15 @@ from __future__ import annotations
 import re
 
 from blue.cli import par_name
-from package_once_blue.validate import providers
+from colors_compute import credential_requirements
+from . import machine
+providers={"provider-dns":{"no-infra":{"required":[],"secrets":[]},"cloudflare":{"required":[],"secrets":["cloudflare-api-token"]}}}
 
 __all__ = ["providers"]
 
-slots = ["provider-compute", "provider-dns", "provider-backend"]
+slots = ["provider-dns"]
 
-supported_compute = {"hcloud"}
+
 
 
 def _entry(opts: dict, slot: str) -> dict | None:
@@ -74,17 +76,13 @@ def _pr_str(value) -> str:
 def state_errors(opts: dict) -> list[str]:
     """All credential-free validation errors."""
     compute = opts.get("provider-compute")
-    errors: list[str] = []
+    errors: list[str] = machine.errors(opts)
     for key in _missing(opts, ["profile", "workdir", "repository", "k3s-version",
                                "flux-version", *_slot_keys(opts, "required")]):
         errors.append(f":{key} is required")
     for slot in slots:
         if opts.get(slot) not in providers.get(slot, {}):
             errors.append(f"unsupported :{slot} {_pr_str(opts.get(slot))}")
-    if compute in providers.get("provider-compute", {}) and compute not in supported_compute:
-        errors.append(f"unsupported :provider-compute {_pr_str(compute)}"
-                      " — K3s v1 supports hcloud only because it owns and tests that "
-                      "provider's firewall")
     if not isinstance(opts.get("compute-prevent-destroy"), bool):
         errors.append(":compute-prevent-destroy must be true or false")
     if (not placeholder(opts.get("repository"))
@@ -108,4 +106,4 @@ def state_errors(opts: dict) -> list[str]:
 def secret_errors(opts: dict) -> list[str]:
     """Credentials required by the selected compute and backend providers."""
     return [f"required credential is not set: {par_name(key)}"
-            for key in dict.fromkeys(_missing(opts, _slot_keys(opts, "secrets")))]
+            for key in dict.fromkeys(_missing(opts, [*_slot_keys(opts, "secrets"),*[v.removeprefix("COLORS_PAR_").lower().replace("_","-") for v in credential_requirements(opts)]]))]

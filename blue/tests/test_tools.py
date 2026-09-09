@@ -1,7 +1,8 @@
 import json
 
 from blue.scaffold import scaffold
-from package_k3s_blue import tools
+from package_k3s_blue import tools,machine
+from test_validate import base
 
 
 def test_stage_names_are_package_specific():
@@ -15,13 +16,8 @@ def test_workdir_resolves_next_to_colors():
                           tools.compute_tool) == "/srv/project/.colors/p/k3s-compute"
 
 
-def test_compute_reuses_once_and_adds_the_firewall():
-    specs = tools.compute_specs({"provider-compute": "hcloud"}, "/w")
-    assert specs[0]["template"]["name"] == "once/tools/tofu/hcloud/main.tf"
-    assert 'resource "hcloud_server" "node1"' in specs[0]["template"]["content"]
-    assert specs[1]["template"]["name"] == "tools/tofu/hcloud/firewall.tf"
-    assert specs[1]["target"] == "/w/firewall.tf"
-
+def test_compute_preserves_legacy_migration_guard():
+    assert machine.requirements(base)['legacy_state_keys']==['k3s-test/k3s-compute.tfstate']
 
 def test_inventory_has_one_k3s_host():
     assert json.loads(tools.inventory(
@@ -36,19 +32,13 @@ def test_template_data_defaults_gitops_conventions():
     assert data["provider-dns"] == "no-infra"
     assert data["repository-branch"] == "main"
     assert data["repository-path"] == "./k8s"
-    assert data["ip"]
+    assert data["ip"] == ""
 
 
-def test_firewall_allows_apps_but_not_the_kubernetes_api(tmp_path):
-    opts = {"profile": "p", "workdir": str(tmp_path), "blue/event": "build",
-            "hcloud-name": "p", "compute-prevent-destroy": True}
-    scaffold(opts, tools.compute_specs(opts, tools.tool_dir(opts, tools.compute_tool)))
-    rendered = open(f"{tools.tool_dir(opts, tools.compute_tool)}/firewall.tf").read()
-    for port in ["22", "80", "443"]:
-        assert f'port       = "{port}"' in rendered
-    assert 'port       = "6443"' not in rendered
-    assert "hcloud_server.node1.id" in rendered
-
+def test_firewall_allows_apps_but_not_the_kubernetes_api():
+    ports=[rule['from_port'] for rule in machine.requirements(base)['security']['ingress'] if rule['protocol']=='tcp']
+    assert ports==[22,80,443]
+    assert 6443 not in ports
 
 async def _render_stage(step, tool, opts, tmp_path):
     merged = {"profile": "p", "workdir": str(tmp_path), "blue/event": "build",
@@ -83,7 +73,7 @@ async def test_local_ssh_config_is_package_owned_and_usable_on_first_connect(tmp
     dir = await _render_stage(tools.ansible_local_step, tools.ansible_local_tool,
                               {}, tmp_path)
     rendered = open(f"{dir}/main.yml").read()
-    assert "k3s {{ host_alias }} ANSIBLE MANAGED BLOCK" in rendered
+    assert "Reference copied into package-owned Ansible plays" in rendered
     # kubectl must not fail on the first connection to a newly created host
     assert "StrictHostKeyChecking accept-new" in rendered
     assert "ForwardAgent no" in rendered

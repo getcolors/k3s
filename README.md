@@ -3,7 +3,7 @@
 A secure single-node K3s server, as a tri-colour Package Skill (green, red,
 blue).
 
-The package provisions one Hetzner Cloud VPS, attaches a firewall exposing only
+The package provisions one VPS through the shared compute library, attaches a firewall exposing only
 SSH and application ports 80/443, installs a pinned K3s and Flux release, and
 points Flux at the public Git repository named by `repository` in `colors.yml`.
 The Kubernetes API on 6443 is not public. Optional Cloudflare integration
@@ -46,11 +46,11 @@ cd green && bb test
 cd green && bb golden
 cd red && bun test && bun run typecheck
 cd blue && uv run pytest
-./scripts/parity.sh            # three colours, three state backends, byte for byte
+./scripts/parity.sh            # all eight providers and both remote backends
 ./scripts/launcher.sh
 ```
 
-Every colour pins its SDK and ONCE. The package consumes ONCE's provider
-registry as data and its hcloud compute template as a resource. The golden
-render is the regression net for that unsupported reuse surface;
-`scripts/parity.sh` is the net across colours.
+Every color directly pins colors-compute for provider validation, networking,
+firewalls, SSH keys, compute and remote state. It supports eight VM providers
+and R2/S3. A provider addition needs only a library version bump. Existing
+legacy state requires explicit migration before create or delete.

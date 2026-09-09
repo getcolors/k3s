@@ -1,15 +1,10 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["package-k3s-blue", "blue", "package-once-blue"]
+# dependencies = ["package-k3s-blue"]
 #
 # [tool.uv.sources]
 # package-k3s-blue = { git = "https://github.com/getcolors/k3s.git", rev = "55240ad1a9bf526630e8f7922a20d590356a4bdf", subdirectory = "blue" }
-# blue = { git = "https://github.com/getcolors/blue.git", rev = "290f313ead5ca162875c33a049c880da017eae09" }
-# package-once-blue = { git = "https://github.com/getcolors/once.git", subdirectory = "blue", rev = "98d3cfa2c743b89a72bac0252c258f9edeedcad7" }
-#
-# [tool.uv]
-# override-dependencies = ["blue @ git+https://github.com/getcolors/blue.git@290f313ead5ca162875c33a049c880da017eae09"]
 # ///
 #
 # Managed by `bb pin` — do not edit by hand, and never invent a SHA.

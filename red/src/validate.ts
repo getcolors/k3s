@@ -7,13 +7,15 @@
 
 import { parName } from "red/cli";
 import type { Opts } from "red/workflow";
-import { providers } from "package-once-red";
+import {credential_requirements} from "colors-compute-red";
+import * as machine from "./machine.ts";
+const providers={"provider-dns":{"no-infra":{required:[],secrets:[]},cloudflare:{required:[],secrets:["cloudflare-api-token"]}}};
 
 export { providers };
 
-export const slots = ["provider-compute", "provider-dns", "provider-backend"];
+export const slots = ["provider-dns"];
 
-export const supportedCompute = new Set(["hcloud"]);
+
 
 interface ProviderEntry {
   required?: string[];
@@ -70,7 +72,7 @@ function prStr(value: unknown): string {
 // All credential-free validation errors.
 export function stateErrors(opts: Opts): string[] {
   const compute = opts["provider-compute"];
-  const errors: string[] = [];
+  const errors: string[] = machine.errors(opts);
   for (const key of missing(opts, ["profile", "workdir", "repository", "k3s-version",
                                    "flux-version", ...slotKeys(opts, "required")])) {
     errors.push(`:${key} is required`);
@@ -79,12 +81,6 @@ export function stateErrors(opts: Opts): string[] {
     if (!((providers as Record<string, Record<string, unknown>>)[slot] ?? {})[String(opts[slot])]) {
       errors.push(`unsupported :${slot} ${prStr(opts[slot])}`);
     }
-  }
-  if ((providers as Record<string, Record<string, unknown>>)["provider-compute"][String(compute)] &&
-      !supportedCompute.has(String(compute))) {
-    errors.push(`unsupported :provider-compute ${prStr(compute)}` +
-      " — K3s v1 supports hcloud only because it owns and tests that " +
-      "provider's firewall");
   }
   if (typeof opts["compute-prevent-destroy"] !== "boolean") {
     errors.push(":compute-prevent-destroy must be true or false");
@@ -109,6 +105,6 @@ export function stateErrors(opts: Opts): string[] {
 
 // Credentials required by the selected compute and backend providers.
 export function secretErrors(opts: Opts): string[] {
-  return [...new Set(missing(opts, slotKeys(opts, "secrets")))]
+  return [...new Set(missing(opts, [...slotKeys(opts,"secrets"),...credential_requirements(opts).map(v=>v.replace(/^COLORS_PAR_/,"").toLowerCase().replaceAll("_","-"))]))]
     .map((key) => `required credential is not set: ${parName(key)}`);
 }

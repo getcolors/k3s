@@ -3,11 +3,12 @@
   (:require
    [clojure.string :as str]
    [green.cli :as green-cli]
-   [io.github.getcolors.once.validate :as once-validate]))
+   [io.github.getcolors.compute :as compute]
+   [io.github.getcolors.k3s.machine :as machine]))
 
-(def providers once-validate/providers)
-(def slots [:provider-compute :provider-dns :provider-backend])
-(def supported-compute #{"hcloud"})
+(def providers {:provider-dns {"no-infra" {:required [] :secrets []} "cloudflare" {:required [] :secrets [:cloudflare-api-token]}}})
+(def slots [:provider-dns])
+
 
 (defn- entry [opts slot]
   (get-in providers [slot (get opts slot)]))
@@ -51,6 +52,7 @@
   (let [compute (:provider-compute opts)]
     (vec
      (concat
+      (machine/errors opts)
       (map #(str % " is required")
            (missing-keys opts
                          (concat [:profile :workdir :repository :k3s-version :flux-version]
@@ -59,11 +61,6 @@
             :let [provider (get opts slot)]
             :when (not (contains? (get providers slot) provider))]
         (str "unsupported " slot " " (pr-str provider)))
-      (when (and (contains? (get providers :provider-compute) compute)
-                 (not (contains? supported-compute compute)))
-        [(str "unsupported :provider-compute " (pr-str compute)
-              " — K3s v1 supports hcloud only because it owns and tests that "
-              "provider's firewall")])
       (when-not (boolean? (:compute-prevent-destroy opts))
         [":compute-prevent-destroy must be true or false"])
       (when (and (not (placeholder? (:repository opts)))
@@ -86,4 +83,4 @@
   "Credentials required by the selected compute and backend providers."
   [opts]
   (map #(str "required credential is not set: " (green-cli/par-name %))
-       (distinct (missing-keys opts (slot-keys opts :secrets)))))
+       (distinct (missing-keys opts (concat (slot-keys opts :secrets) (map #(-> % (str/replace #"^COLORS_PAR_" "") str/lower-case (str/replace "_" "-") keyword) (compute/credential-requirements opts)))))))

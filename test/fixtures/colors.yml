@@ -1,23 +1,96 @@
-# Plausible, fictional desired state for unit and golden builds.
+# Fictional values for credential-free build tests.
 profile: k3s-fixture
 workdir: .colors
-
 provider-compute: hcloud
 provider-dns: no-infra
-provider-backend: local
+provider-backend: s3
 compute-prevent-destroy: true
-
 repository: https://github.com/getcolors/k3s-helloworld.git
 k3s-version: v1.36.2+k3s1
 flux-version: v2.9.2
-
 hcloud-name: k3s-fixture
 hcloud-image: ubuntu-24.04
 hcloud-server-type: cx23
 hcloud-location: nbg1
 hcloud-ssh-keys: fixture-key
-
 s3-bucket: k3s-fixture-state
 s3-region: eu-central-1
 r2-bucket: k3s-fixture-state
 r2-endpoint: https://fixture.eu.r2.cloudflarestorage.com
+compute-ssh-sources:
+- 0.0.0.0/0
+compute-http-sources:
+- 0.0.0.0/0
+digitalocean-name: airflow-fixture
+digitalocean-region: ams3
+digitalocean-size: s-2vcpu-8gb
+digitalocean-image: ubuntu-24-04-x64
+digitalocean-vpc-uuid: 00000000-0000-0000-0000-000000000000
+digitalocean-ssh-keys: fixture-key
+digitalocean-firewall: true
+digitalocean-ssh-sources:
+- 0.0.0.0/0
+- ::/0
+digitalocean-http-sources:
+- 0.0.0.0/0
+- ::/0
+oci-config-file-profile: DEFAULT
+oci-subnet-id: ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaafixturesubnet
+oci-compartment-id: ocid1.tenancy.oc1..aaaaaaaafixturecompartment
+oci-availability-domain: XquT:EU-FRANKFURT-1-AD-1
+oci-display-name: airflow-fixture
+oci-shape: VM.Standard.A2.Flex
+oci-ocpus: 2
+oci-memory-in-gbs: 12
+oci-boot-volume-size-in-gbs: 100
+oci-boot-volume-vpus-per-gb: 30
+oci-ssh-authorized-keys: /home/fixture/.ssh/id_ed25519.pub
+yandex-cloud-id: b1gfixturecloud
+yandex-folder-id: b1gfixturefolder
+yandex-zone: ru-central1-a
+yandex-image-family: ubuntu-2404-lts
+yandex-name: airflow-fixture
+yandex-subnet-cidr: 10.0.0.0/24
+yandex-platform-id: standard-v3
+yandex-cores: 2
+yandex-memory-gb: 8
+yandex-core-fraction: 100
+yandex-disk-size-gb: 50
+azure-subscription-id: 00000000-0000-0000-0000-000000000000
+azure-location: swedencentral
+azure-resource-group: airflow
+azure-name: airflow
+azure-vm-size: Standard_D2pls_v6
+azure-image-publisher: Canonical
+azure-image-offer: ubuntu-24_04-lts
+azure-image-sku: server-arm64
+azure-image-version: 24.04.202608020
+azure-vnet-cidr: 10.10.0.0/16
+azure-subnet-cidr: 10.10.1.0/24
+azure-boot-disk-size-gb: 30
+azure-ssh-authorized-keys: /tmp/airflow.pub
+aws-region: eu-west-1
+aws-availability-zone: eu-west-1a
+aws-name: airflow
+aws-instance-type: t3.small
+aws-image-id: ami-example
+aws-vpc-cidr: 10.0.0.0/16
+aws-subnet-cidr: 10.0.1.0/24
+aws-root-volume-size-gb: 30
+aws-ssh-authorized-keys: /tmp/airflow.pub
+google-project: airflow-example
+google-region: europe-west4
+google-zone: europe-west4-b
+google-name: airflow
+google-machine-type: t2a-standard-1
+google-image-project: ubuntu-os-cloud
+google-image-family: ubuntu-2404-lts-arm64
+google-image-id: projects/ubuntu-os-cloud/global/images/ubuntu-example
+google-subnet-cidr: 10.20.1.0/24
+google-boot-disk-size-gb: 30
+google-ssh-authorized-keys: /tmp/airflow.pub
+vultr-region: ams
+vultr-plan: vc2-2c-4gb
+vultr-os-id: 2284
+vultr-ssh-key-ids:
+- 00000000-0000-0000-0000-000000000000

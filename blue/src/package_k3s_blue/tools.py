@@ -16,7 +16,7 @@ from blue.providers import tool_env
 from blue.scaffold import PRESERVE_JINJA_DELIMITERS, content_spec, scaffold
 from blue.workflow import StepError, failed
 
-from . import utils, validate
+from . import utils, validate, machine
 
 compute_tool = "k3s-compute"
 ansible_local_tool = "k3s-ansible-local"
@@ -39,14 +39,6 @@ def template(path: str, file: str) -> dict:
     return {"name": name, "content": source.read_text()}
 
 
-def once_template(provider: str) -> dict:
-    """ONCE's unmodified Hetzner compute template, resolved from the installed
-    package the way the clickhouse package resolves ONCE's compute template."""
-    name = f"tools/tofu/{provider}/main.tf"
-    content = files("package_once_blue").joinpath(f"resources/{name}").read_text()
-    return {"name": f"once/{name}", "content": content}
-
-
 def spec(source: dict, target: str, data: dict) -> dict:
     return {"template": source, "target": target, "data": data, "opts": template_opts}
 
@@ -55,46 +47,8 @@ def raw_spec(target: str, content: str) -> dict:
     return content_spec(target, content)
 
 
-def credential_env(opts: dict, *slots: str) -> dict[str, str] | None:
-    """Provider and backend environment additions, omitting absent credentials."""
-    return tool_env(validate.providers, opts, [*slots, "provider-backend"])
-
-
-def fallback_compute_params(opts: dict) -> dict:
-    """Stand-in values that keep build and dry-run credential-free."""
-    return {"ip": "192.168.0.1",
-            "sudoer": "root",
-            "name": opts.get("profile") or "k3s",
-            "user": "root"}
-
-
-def compute_specs(opts: dict, dir: str) -> list[dict]:
-    """ONCE's hcloud server plus this package's firewall and attachment."""
-    return [spec(once_template("hcloud"), f"{dir}/main.tf", opts),
-            spec(template("tofu.hcloud", "firewall.tf"), f"{dir}/firewall.tf", opts)]
-
-
-def _output_params(opts: dict) -> dict | None:
-    return (opts.get("tofu/outputs") or {}).get("params")
-
-
-async def compute_step(opts: dict) -> dict:
-    """Render/apply compute, then adopt the server address for both Ansible
-    stages."""
-    dir = tool_dir(opts, compute_tool)
-    fallback = fallback_compute_params(opts)
-    result = await tofu.tofu_with_spec(opts, compute_specs(opts, dir),
-                                       dir=dir,
-                                       env=credential_env(opts, "provider-compute"))
-    if failed(result):
-        return result
-    if opts.get("blue/event") == "build":
-        return {**result, **fallback, "k3s/compute-params": fallback}
-    if opts.get("blue/event") == "delete":
-        return result
-    params = {**fallback, **(_output_params(result) or {})}
-    return {**result, **params, "k3s/compute-params": params}
-
+fallback_compute_params=machine.fallback_params
+compute_step=machine.step
 
 def _java_double(x: float) -> str:
     """Java's Double.toString, which is what Green's cheshire JSON emits for
@@ -150,7 +104,7 @@ def inventory(opts: dict) -> str:
     return _pretty(
         {"all": {"children": {"k3s": {"hosts": {
             alias: {"ansible_host": opts.get("ip"),
-                    "ansible_user": opts.get("user")}}}}}})
+                    "ansible_user": opts.get("user"), **({"ansible_ssh_private_key_file":opts["ssh-private-key-path"]} if opts.get("ssh-private-key-path") else {})}}}}}})
 
 
 def _not_empty(value) -> str | None:
@@ -161,7 +115,7 @@ def _not_empty(value) -> str | None:
 def data_fn(opts: dict) -> dict:
     """Complete deterministic template data for build as well as create."""
     return {**opts,
-            "ip": _not_empty(opts.get("ip")) or "192.168.0.1",
+            "ip": _not_empty(opts.get("ip")) or "",
             "user": _not_empty(opts.get("user")) or "root",
             "host-alias": utils.host_alias(opts),
             "provider-dns": _not_empty(opts.get("provider-dns")) or "no-infra",
@@ -182,9 +136,8 @@ async def ansible_local_step(opts: dict) -> dict:
         dir=dir,
         inventory="inventory.ini",
         playbooks={"create": "main.yml", "delete": "main.yml"},
-        extra_vars={"host_alias": data["host-alias"],
-                    "ip": data["ip"],
-                    "user": data["user"],
+        extra_vars={"ssh_legacy_marker_prefix":"k3s","host_alias": data["host-alias"],
+                    "ssh_hosts":[{"name":data["host-alias"],"ip":data["ip"],"user":data["user"],"identity_file":opts.get("ssh-private-key-path")}],
                     "block_state": "absent" if delete else "present"})
 
 

@@ -13,9 +13,14 @@ accept=0
 build_variant() {
   local variant=$1
   shift
+  local fixture="$state"
+  if [ "$variant" = managed ]; then
+    fixture="$tmp/managed-colors.yml"
+    sed '/^hcloud-ssh-keys:/d' "$state" > "$fixture"
+  fi
   (
     cd "$root/green"
-    env K3S_LIB_ROOT="$root" COLORS_PAR_WORKDIR="$tmp/$variant" "$@" ./green build -f "$state" >/dev/null
+    env K3S_LIB_ROOT="$root" COLORS_PAR_WORKDIR="$tmp/$variant" "$@" ./green build -f "$fixture" >/dev/null
   )
   if [ "$accept" = 1 ]; then
     rm -rf "${goldens:?}/$variant"
@@ -28,26 +33,16 @@ build_variant() {
   fi
 }
 
-build_variant local
+build_variant hcloud
+build_variant managed
 build_variant r2 COLORS_PAR_PROVIDER_BACKEND=r2
 build_variant s3 COLORS_PAR_PROVIDER_BACKEND=s3
 
-main="$tmp/local/k3s-fixture/k3s-compute/main.tf"
-firewall="$tmp/local/k3s-fixture/k3s-compute/firewall.tf"
-gitops="$tmp/local/k3s-fixture/k3s-ansible-remote/gitops.yml"
-
-grep -q 'resource "hcloud_server" "node1"' "$main" || {
-  echo 'golden: ONCE no longer declares hcloud_server.node1' >&2; exit 1;
-}
-grep -q 'hcloud_server.node1.id' "$firewall" || {
-  echo 'golden: firewall is no longer attached to hcloud_server.node1' >&2; exit 1;
-}
-if grep -q 'port[[:space:]]*=[[:space:]]*"6443"' "$firewall"; then
+gitops="$tmp/hcloud/k3s-fixture/k3s-ansible-remote/gitops.yml"
+[ -f "$tmp/hcloud/k3s-fixture/k3s-compute/shared/backend.tf.json" ] || exit 1
+if grep -rEq '\"(from_port|to_port|port)\"[[:space:]]*:[[:space:]]*\"?6443' "$tmp/hcloud/k3s-fixture/k3s-compute"; then
   echo 'golden: Kubernetes API port 6443 is public' >&2; exit 1
 fi
-[ -d "$tmp/local/k3s-fixture/k3s-compute" ] || {
-  echo 'golden: compute stage was renamed' >&2; exit 1;
-}
 grep -q 'getcolors/k3s-helloworld.git' "$gitops" || {
   echo 'golden: Flux repository is missing' >&2; exit 1;
 }

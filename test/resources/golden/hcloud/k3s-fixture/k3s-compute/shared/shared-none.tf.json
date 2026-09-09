@@ -1,0 +1,64 @@
+{
+  "output": {
+    "params": {
+      "value": {
+        "firewall_id": "${hcloud_firewall.network.id}",
+        "provider": "hcloud"
+      }
+    }
+  },
+  "provider": {
+    "hcloud": {}
+  },
+  "resource": {
+    "hcloud_firewall": {
+      "network": {
+        "lifecycle": {
+          "prevent_destroy": true
+        },
+        "name": "k3s-fixture-firewall",
+        "rule": [
+          {
+            "direction": "in",
+            "port": "80",
+            "protocol": "tcp",
+            "source_ips": [
+              "0.0.0.0/0"
+            ]
+          },
+          {
+            "direction": "in",
+            "port": "443",
+            "protocol": "tcp",
+            "source_ips": [
+              "0.0.0.0/0"
+            ]
+          },
+          {
+            "direction": "in",
+            "protocol": "icmp",
+            "source_ips": [
+              "0.0.0.0/0"
+            ]
+          },
+          {
+            "direction": "in",
+            "port": "22",
+            "protocol": "tcp",
+            "source_ips": [
+              "0.0.0.0/0"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "terraform": {
+    "required_providers": {
+      "hcloud": {
+        "source": "hetznercloud/hcloud",
+        "version": "1.54.0"
+      }
+    }
+  }
+}

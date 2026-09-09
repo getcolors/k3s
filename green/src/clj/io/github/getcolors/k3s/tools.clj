@@ -11,6 +11,7 @@
    [green.tofu :as tofu]
    [green.workflow :as wf]
    [io.github.getcolors.k3s.utils :as utils]
+   [io.github.getcolors.k3s.machine :as machine]
    [io.github.getcolors.k3s.validate :as validate]))
 
 (def compute-tool "k3s-compute")
@@ -18,16 +19,12 @@
 (def ansible-remote-tool "k3s-ansible-remote")
 
 (def ^:private k3s-root "io.github.getcolors.k3s.tools")
-(def ^:private once-root "io.github.getcolors.once.tools")
 (def ^:private template-opts sc/preserve-jinja-delimiters)
 
 (defn tool-dir
   "Resolve a stage beside colors.yml, never relative to the caller."
   [opts tool]
   (green-cli/stage-dir opts tool {:default-profile "k3s"}))
-
-(defn- once-template [tool provider file]
-  (keyword (str once-root "." tool "." provider) file))
 
 (defn- k3s-template [tool file]
   (keyword (str k3s-root "." tool) file))
@@ -38,61 +35,22 @@
 (defn- raw-spec [target content]
   (sc/content-spec target content))
 
-(defn credential-env
-  "Provider and backend environment additions, omitting absent credentials."
-  [opts & slots]
-  (provider-ops/tool-env validate/providers opts
-                         (conj (vec slots) :provider-backend)))
-
-(defn fallback-compute-params
-  "Stand-in values that keep build and dry-run credential-free."
-  [{:keys [profile]}]
-  {:ip "192.168.0.1"
-   :sudoer "root"
-   :name (or profile "k3s")
-   :user "root"})
-
-(defn compute-specs
-  "ONCE's hcloud server plus this package's firewall and attachment."
-  [opts dir]
-  [(template-spec (once-template "tofu" "hcloud" "main.tf")
-                  (str dir "/main.tf") opts)
-   (template-spec (k3s-template "tofu.hcloud" "firewall.tf")
-                  (str dir "/firewall.tf") opts)])
-
-(defn- output-params [opts]
-  (some-> (get-in opts [:tofu/outputs :params]) walk/keywordize-keys))
-
-(defn compute-step
-  "Render/apply compute, then adopt the server address for both Ansible stages."
-  [opts]
-  (let [dir (tool-dir opts compute-tool)
-        fallback (fallback-compute-params opts)
-        result (tofu/tofu-with-spec
-                opts (compute-specs opts dir)
-                {:dir dir :env (credential-env opts :provider-compute)})]
-    (cond
-      (wf/failed? result) result
-      (= :build (:green/event opts))
-      (merge result fallback {:k3s/compute-params fallback})
-      (= :delete (:green/event opts)) result
-      :else
-      (let [params (merge fallback (output-params result))]
-        (merge result params {:k3s/compute-params params})))))
+(def fallback-compute-params machine/fallback-params)
+(def compute-step machine/step)
 
 (defn inventory
   "One-host JSON inventory keyed by the managed SSH alias."
-  [{:keys [ip user host-alias]}]
+  [{:keys [ip user host-alias ssh-private-key-path]}]
   (json/generate-string
    {:all {:children {:k3s {:hosts {(or host-alias "k3s")
-                                    {:ansible_host ip :ansible_user user}}}}}}
+                                    (cond-> {:ansible_host ip :ansible_user user} ssh-private-key-path (assoc :ansible_ssh_private_key_file ssh-private-key-path))}}}}}
    {:pretty true}))
 
 (defn data-fn
   "Complete deterministic template data for build as well as create."
   [opts]
   (assoc opts
-         :ip (or (not-empty (str (:ip opts))) "192.168.0.1")
+         :ip (str (:ip opts))
          :user (or (not-empty (str (:user opts))) "root")
          :host-alias (utils/host-alias opts)
          :provider-dns (or (not-empty (str (:provider-dns opts))) "no-infra")
@@ -116,9 +74,8 @@
      {:dir dir
       :inventory "inventory.ini"
       :playbooks {:create "main.yml" :delete "main.yml"}
-      :extra-vars {:host_alias (:host-alias data)
-                   :ip (:ip data)
-                   :user (:user data)
+      :extra-vars {:ssh_legacy_marker_prefix "k3s" :host_alias (:host-alias data)
+                   :ssh_hosts [{:name (:host-alias data) :ip (:ip data) :user (:user data) :identity_file (:ssh-private-key-path opts)}]
                    :block_state (if delete? "absent" "present")}}
      specs)))
 

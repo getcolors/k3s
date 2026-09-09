@@ -10,6 +10,7 @@
    [green.cli :as green-cli]
    [green.process :as process]
    [io.github.getcolors.k3s.utils :as utils]
+   [io.github.getcolors.compute-ssh :as ssh]
    [io.github.getcolors.k3s.validate :as validate]))
 
 (def shell-quote
@@ -22,7 +23,7 @@
   (let [remote (str/join " "
                          (map shell-quote
                               (concat ["sudo" "-n" "k3s" "kubectl"] args)))]
-    ["ssh" "--" (utils/host-alias opts) remote]))
+    (vec (concat ["ssh"] (when-let [path (:private_key_path (ssh/mode (merge {:provider-compute "hcloud"} opts)))] ["-i" path]) ["--" (utils/host-alias opts) remote]))))
 
 (def inherit-run
   "Run argv with the caller's terminal streams attached."

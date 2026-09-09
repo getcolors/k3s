@@ -1,8 +1,20 @@
 ---
 - name: Install K3s and Flux
   hosts: k3s
+  gather_facts: false
   become: true
   tasks:
+    - name: Wait for SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 600
+
+    - name: Wait for cloud-init when installed
+      ansible.builtin.shell: if command -v cloud-init >/dev/null 2>&1; then cloud-init status --wait; fi
+      changed_when: false
+
+    - name: Gather facts after SSH and cloud-init are ready
+      ansible.builtin.setup:
+
     - name: Verify SSH and Python
       ansible.builtin.ping:
 

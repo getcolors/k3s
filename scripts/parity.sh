@@ -26,17 +26,26 @@ tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 
 build_variant() {
   local variant=$1; shift
+  local fixture="$state"
+  if [ "$variant" = managed ]; then
+    fixture="$tmp/managed-colors.yml"
+    sed '/^hcloud-ssh-keys:/d' "$state" > "$fixture"
+  fi
   (cd "$root/green" && env K3S_LIB_ROOT="$root" \
-    COLORS_PAR_WORKDIR="$tmp/$variant/green" "$@" ./green build -f "$state" >/dev/null)
+    COLORS_PAR_WORKDIR="$tmp/$variant/green" "$@" ./green build -f "$fixture" >/dev/null)
   (cd "$root/red" && env K3S_LIB_ROOT="$root" \
-    COLORS_PAR_WORKDIR="$tmp/$variant/red" "$@" ./red build -f "$state" >/dev/null)
+    COLORS_PAR_WORKDIR="$tmp/$variant/red" "$@" ./red build -f "$fixture" >/dev/null)
   (cd "$root/blue" && env COLORS_PAR_WORKDIR="$tmp/$variant/blue" "$@" \
-    uv run python -m package_k3s_blue build -f "$state" >/dev/null)
+    uv run python -m package_k3s_blue build -f "$fixture" >/dev/null)
   diff -r "$tmp/$variant/green" "$tmp/$variant/red"
   diff -r "$tmp/$variant/green" "$tmp/$variant/blue"
 }
 
-build_variant local
+build_variant hcloud
+build_variant managed
+for provider in azure aws google digitalocean vultr yandex oci; do
+  build_variant "$provider" COLORS_PAR_PROVIDER_COMPUTE="$provider"
+done
 build_variant r2 COLORS_PAR_PROVIDER_BACKEND=r2
 build_variant s3 COLORS_PAR_PROVIDER_BACKEND=s3
 

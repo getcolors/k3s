@@ -45,3 +45,7 @@
                               (fn [_] {:exit 255 :err "unreachable"}) {})]
       (is (= 255 (:green/exit result)))
       (is (= "unreachable" (:green/err result))))))
+
+(deftest external-private-key-reaches-kubectl
+  (let [args (kubectl/command {:profile "p" :provider-compute "hcloud" :hcloud-ssh-keys "existing" :ssh-private-key-path "/tmp/example key"} ["get" "nodes"])]
+    (is (= ["ssh" "-i" "/tmp/example key" "--"] (subvec args 0 4)))))

@@ -5,6 +5,7 @@
    [clojure.test :refer [deftest is]]
    [green.workflow :as wf]
    [io.github.getcolors.k3s.tools :as tools]
+   [io.github.getcolors.k3s.machine :as machine]
    [io.github.getcolors.k3s.validate-test :as vt]
    [io.github.getcolors.k3s.workflow :as workflow]))
 
@@ -47,12 +48,11 @@
   (is (= 0 (:green/exit
             (start (assoc vt/base :green/event :create :green/dry-run true))))))
 
-(deftest delete-guard-is-lifted-only-for-one-environment
-  (let [token {"COLORS_PAR_HCLOUD_TOKEN" "token"}]
-    (is (= 2 (:green/exit (start (assoc vt/base :green/event :delete) token))))
-    (is (= 0 (:green/exit
-              (start (assoc vt/base :green/event :delete)
-                     (assoc token "COLORS_PAR_COMPUTE_PREVENT_DESTROY" "false")))))))
+(deftest delete-requires-owned-inventory-after-protection
+  (with-redefs [machine/load-inventory (fn [& _] {:green/exit 1 :green/err "missing inventory"})]
+    (let [token {"COLORS_PAR_HCLOUD_TOKEN" "token"}]
+      (is (= 2 (:green/exit (start (assoc vt/base :green/event :delete) token))))
+      (is (= 1 (:green/exit (start (assoc vt/base :green/event :delete) (assoc token "COLORS_PAR_COMPUTE_PREVENT_DESTROY" "false"))))))))
 
 (deftest profile-overlay-stops-before-rendering
   (let [result (start (assoc vt/base :green/event :build)
@@ -60,15 +60,12 @@
     (is (= 2 (:green/exit result)))
     (is (str/includes? (:green/err result) "COLORS_PAR_PROFILE"))))
 
-(deftest state-key-is-profile-plus-k3s-stage
-  (let [advice (workflow/backend-advice tools/compute-tool)
-        result (advice {:provider-backend "r2" :profile "k3s-hetzner"
-                        :workdir (temp-dir)
-                        :r2-bucket "shared" :r2-endpoint "https://r2.example"})
-        backend (slurp (str (tools/tool-dir result tools/compute-tool)
-                            "/backend.tf.json"))]
-    (is (str/includes? backend "k3s-hetzner/k3s-compute.tfstate"))
-    (is (not (str/includes? backend "tofu-compute.tfstate")))))
+(deftest state-key-is-library-owned
+  (let [opts (assoc vt/base :green/event :build :workdir (temp-dir))
+        _ (machine/step opts)
+        backend (slurp (str (tools/tool-dir opts tools/compute-tool) "/shared/backend.tf.json"))]
+    (is (str/includes? backend "compute"))
+    (is (not (str/includes? backend "k3s-compute.tfstate")))))
 
 (deftest whole-build-renders-every-stage
   (let [dir (temp-dir)
@@ -76,9 +73,8 @@
                        (assoc vt/base :green/event :build :workdir dir :profile "built"))
         root (str dir "/built/")]
     (is (= 0 (:green/exit result)))
-    (doseq [file ["k3s-compute/main.tf"
-                  "k3s-compute/firewall.tf"
-                  "k3s-compute/backend.tf.json"
+    (doseq [file ["k3s-compute/shared/backend.tf.json"
+                  "k3s-compute/nodes/0/node-none.tf.json"
                   "k3s-ansible-local/main.yml"
                   "k3s-ansible-local/inventory.ini"
                   "k3s-ansible-remote/main.yml"
