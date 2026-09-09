@@ -1,5 +1,7 @@
 (ns io.github.getcolors.k3s.workflow-test
   (:require
+   [io.github.getcolors.compute-inspection :as inspection]
+   [io.github.getcolors.k3s.validate :as validate]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is]]
@@ -94,3 +96,26 @@
   (doseq [event [:create :build]]
     (is (= [:k3s/ansible-local] (vec (rest (workflow/wire-fn :k3s/compute {:green/event event})))))
     (is (= [:k3s/ansible-remote] (vec (rest (workflow/wire-fn :k3s/ansible-local {:green/event event})))))))
+
+(deftest repeated-delete-stops-after-validated-inspection
+  (let [reads (atom 0) credentials (atom 0)
+        dir (str (java.nio.file.Files/createTempDirectory "k3s-repeat-" (make-array java.nio.file.attribute.FileAttribute 0)))
+        original (:wire-fn workflow/workflow)]
+    (with-redefs [inspection/read-deployment (fn [& _] (swap! reads inc) {:status "destroyed"})
+                  validate/state-errors (constantly [])
+                  validate/secret-errors (fn [& _] (swap! credentials inc) [])]
+      (let [graph (assoc workflow/workflow :wire-fn (fn [step opts] (is (= :k3s/start step)) (original step opts)))
+            result (wf/run graph {:green/event :delete :profile "absent-keys" :workdir dir :compute-prevent-destroy false})]
+        (is (= 0 (:green/exit result)))
+        (is (true? (:colors-compute/already-destroyed result)))
+        (is (= 1 @reads)) (is (pos? @credentials))
+        (is (empty? (seq (.listFiles (java.io.File. dir)))))
+        (is (= 1 (:green/exit (machine/load-inventory {:green/event :create} {}))))))))
+
+(deftest credentials-and-failure-routing-remain
+  (with-redefs [inspection/read-deployment (fn [& _] (is false "must not inspect before credentials"))
+                validate/state-errors (constantly [])
+                validate/secret-errors (constantly ["required credential absent"])]
+    (is (not= 0 (:green/exit (workflow/start-step {:green/event :delete :compute-prevent-destroy false} {})))))
+  (is (= [] (workflow/next-fn :x [:y] {:green/exit 1})))
+  (is (= [[:y {:green/exit 0}]] (workflow/next-fn :x [:y] {:green/exit 0}))))

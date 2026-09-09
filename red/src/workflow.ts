@@ -6,7 +6,7 @@ import * as dryRun from "red/dry-run";
 import { preflight } from "red/lifecycle";
 import * as progress from "red/progress";
 import * as tofu from "red/tofu";
-import { adviceAdd, workflow, type Opts, type WireDecl } from "red/workflow";
+import { adviceAdd, failed, workflow, type NextFn, type Opts, type WireDecl } from "red/workflow";
 import * as tools from "./tools.ts";
 import * as machine from "./machine.ts";
 import * as validate from "./validate.ts";
@@ -77,8 +77,12 @@ export const sideEffectingSteps = [
   "k3s/compute", "k3s/ansible-local", "k3s/ansible-remote", "k3s/ansible-cleanup",
 ];
 
+export const nextFn: NextFn = (_step, successors, opts) =>
+  failed(opts) || opts['colors-compute/already-destroyed'] === true
+    ? [] : (successors ?? []).map(step => [step, opts] as const);
+
 function create() {
-  let wf = workflow({ start: "k3s/start", wireFn });
+  let wf = workflow({ start: "k3s/start", wireFn, nextFn });
   wf = progress.advise(wf);
   wf = dryRun.advise(wf, sideEffectingSteps);
   return wf;

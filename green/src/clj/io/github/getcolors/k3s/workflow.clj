@@ -64,7 +64,11 @@
 (def side-effecting-steps
   [:k3s/compute :k3s/ansible-local :k3s/ansible-remote :k3s/ansible-cleanup])
 
+(defn next-fn [_ successors opts]
+  (if (or (wf/failed? opts) (true? (:colors-compute/already-destroyed opts)))
+    [] (mapv #(vector % opts) successors)))
+
 (def workflow
-  (-> (wf/workflow {:start :k3s/start :wire-fn wire-fn})
+  (-> (wf/workflow {:start :k3s/start :wire-fn wire-fn :next-fn next-fn})
       progress/advise
       (dry-run/advise side-effecting-steps)))

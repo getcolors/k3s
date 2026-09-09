@@ -61,3 +61,8 @@ local overrides. Never invent or hand-edit package SHAs. Deployment launchers
 are copies and need refreshing after publication.
 
 Create and build serialize the package-owned SSH alias stage before remote Ansible. A failed local ownership check stops application convergence.
+
+A repeated delete whose validated library inspection reports destroyed stops
+after start, without key files or repeated cleanup. Credential validation still
+runs first. The same inspection status is refused outside delete, and workflow
+failure routing remains unchanged.

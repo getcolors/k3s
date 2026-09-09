@@ -45,6 +45,7 @@ export async function step(opts: Opts): Promise<Opts> {
 }
 export async function load(opts:Opts, env:Record<string,string|undefined>=process.env):Promise<Opts>{
   const result:any=await read_deployment(opts,env);
+  if(result.status==='destroyed' && opts['red/event']==='delete')return {...opts,'colors-compute/already-destroyed':true,'red/exit':0};
   if(result.status!=='present')return {...opts,'red/exit':1,'red/err':'compute inventory unavailable; legacy state requires explicit migration'};
   const adopted=params(opts,result);return {...opts,...adopted,'k3s/compute-params':adopted,'colors-compute/cluster':result.cluster,'red/exit':0};
 }
