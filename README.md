@@ -55,4 +55,4 @@ firewalls, SSH keys, compute and remote state. It supports eight VM providers
 and R2/S3. A provider addition needs only a library version bump. Existing
 legacy state requires explicit migration before create or delete.
 
-Create and build serialize the package-owned SSH alias stage before remote Ansible. A failed local ownership check stops application convergence; GitHub publication remains after remote convergence.
+Create and build serialize the package-owned SSH alias stage before remote Ansible. A failed local ownership check stops application convergence.

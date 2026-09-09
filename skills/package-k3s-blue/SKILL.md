@@ -88,4 +88,4 @@ Legacy <profile>/k3s-compute.tfstate needs explicit migration. Do not create
 against an existing legacy deployment to attempt adoption. Delete reads recorded
 library inventory before cleanup and stops on missing inventory or cleanup failure.
 
-Create and build serialize the package-owned SSH alias stage before remote Ansible. A failed local ownership check stops application convergence; GitHub publication remains after remote convergence.
+Create and build serialize the package-owned SSH alias stage before remote Ansible. A failed local ownership check stops application convergence.
