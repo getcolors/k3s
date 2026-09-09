@@ -36,7 +36,7 @@ import { homedir } from "node:os";
 // directory, which would halt Bun's upward resolution of `package-k3s-red`
 // and break the development symlink at red/red.
 const PINS = {
-  "package-k3s-red": "github:getcolors/k3s#866030f314c2bde78f43cb259a0d24a1a06d28d5",
+  "package-k3s-red": "github:getcolors/k3s#f4f5917e772fd257b44b3a7b8594786dcded4e42",
 };
 
 // PINS is the only source of versions, as green's inline SHA and blue's PEP
