@@ -20,7 +20,7 @@
 
 (deftest create-forks-after-compute
   (is (= [:k3s/compute] (steps-for :create :k3s/start)))
-  (is (= [:k3s/ansible-local :k3s/ansible-remote]
+  (is (= [:k3s/ansible-local]
          (steps-for :create :k3s/compute))))
 
 (deftest delete-cleans-local-state-before-destroy
@@ -89,3 +89,8 @@
                               :workdir dir :profile "dry"))]
     (is (= 0 (:green/exit result)))
     (is (empty? (seq (.listFiles (io/file dir)))))))
+
+(deftest ssh-alias-precedes-remote-convergence
+  (doseq [event [:create :build]]
+    (is (= [:k3s/ansible-local] (vec (rest (workflow/wire-fn :k3s/compute {:green/event event})))))
+    (is (= [:k3s/ansible-remote] (vec (rest (workflow/wire-fn :k3s/ansible-local {:green/event event})))))))

@@ -244,7 +244,7 @@ const stepsFor = (event: string, step: string): string[] =>
 describe("workflow", () => {
   test("create forks after compute", () => {
     expect(stepsFor("create", "k3s/start")).toEqual(["k3s/compute"]);
-    expect(stepsFor("create", "k3s/compute")).toEqual(["k3s/ansible-local", "k3s/ansible-remote"]);
+    expect(stepsFor("create", "k3s/compute")).toEqual(["k3s/ansible-local"]);
   });
 
   test("delete cleans local state before destroy", () => {

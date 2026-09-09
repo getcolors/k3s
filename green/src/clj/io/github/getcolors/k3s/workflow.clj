@@ -57,8 +57,8 @@
     ;; :create and :build
     (case step
       :k3s/start [start-step :k3s/compute]
-      :k3s/compute [tools/compute-step :k3s/ansible-local :k3s/ansible-remote]
-      :k3s/ansible-local [tools/ansible-local-step]
+      :k3s/compute [tools/compute-step :k3s/ansible-local]
+      :k3s/ansible-local [tools/ansible-local-step :k3s/ansible-remote]
       :k3s/ansible-remote [tools/ansible-remote-step])))
 
 (def side-effecting-steps

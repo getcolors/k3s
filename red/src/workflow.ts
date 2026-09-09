@@ -65,8 +65,8 @@ export function wireFn(step: string, runOpts: Opts): WireDecl | undefined {
   // create and build
   const graph: Record<string, WireDecl> = {
     "k3s/start": [startStep, "k3s/compute"],
-    "k3s/compute": [tools.computeStep, "k3s/ansible-local", "k3s/ansible-remote"],
-    "k3s/ansible-local": [tools.ansibleLocalStep],
+    "k3s/compute": [tools.computeStep, "k3s/ansible-local"],
+    "k3s/ansible-local": [tools.ansibleLocalStep, "k3s/ansible-remote"],
     "k3s/ansible-remote": [tools.ansibleRemoteStep],
   };
   return graph[step];

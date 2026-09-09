@@ -13,7 +13,7 @@ def steps_for(event, step):
 
 def test_create_forks_after_compute():
     assert steps_for("create", "k3s/start") == ("k3s/compute",)
-    assert steps_for("create", "k3s/compute") == ("k3s/ansible-local", "k3s/ansible-remote")
+    assert steps_for("create", "k3s/compute") == ("k3s/ansible-local",)
 
 
 def test_delete_cleans_local_state_before_destroy():

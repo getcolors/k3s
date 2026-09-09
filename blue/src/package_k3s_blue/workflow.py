@@ -54,8 +54,8 @@ def wire_fn(step: str, run_opts: dict):
     # create and build
     return {
         "k3s/start": (start_step, "k3s/compute"),
-        "k3s/compute": (tools.compute_step, "k3s/ansible-local", "k3s/ansible-remote"),
-        "k3s/ansible-local": (tools.ansible_local_step,),
+        "k3s/compute": (tools.compute_step, "k3s/ansible-local"),
+        "k3s/ansible-local": (tools.ansible_local_step, "k3s/ansible-remote"),
         "k3s/ansible-remote": (tools.ansible_remote_step,),
     }.get(step)
 

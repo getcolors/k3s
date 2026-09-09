@@ -59,3 +59,5 @@ After an authorized source commit and push, run bb pin in a clean checkout.
 Commit and push the stamps, then verify all three copied launchers without
 local overrides. Never invent or hand-edit package SHAs. Deployment launchers
 are copies and need refreshing after publication.
+
+Create and build serialize the package-owned SSH alias stage before remote Ansible. A failed local ownership check stops application convergence; GitHub publication remains after remote convergence.
