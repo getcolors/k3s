@@ -36,7 +36,7 @@ import { homedir } from "node:os";
 // directory, which would halt Bun's upward resolution of `package-k3s-red`
 // and break the development symlink at red/red.
 const PINS = {
-  "package-k3s-red": "github:getcolors/k3s#f4f5917e772fd257b44b3a7b8594786dcded4e42",
+  "package-k3s-red": "github:getcolors/k3s#fa4cd21b548bfd295e1ff7d8f993a387d31c9198",
   // The Red SDK is a peer of colors-compute-red, not a dependency: a cold
   // cache installs nothing for a peer, so the consumer pins it explicitly, at
   // the commit red/package.json pins. scripts/launcher.sh checks they agree.
