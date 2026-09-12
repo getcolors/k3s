@@ -38,7 +38,7 @@
 
 (deftest providers-come-from-onces-registry
   (is (= [:provider-dns] validate/slots))
-  (is (seq (matching (assoc base :provider-backend "gcs")
+  (is (seq (matching (assoc base :provider-backend "azure")
                      #"provider-backend")))
   (let [r2 (assoc base :provider-backend "r2"
                   :r2-bucket "b" :r2-endpoint "https://r2.example"

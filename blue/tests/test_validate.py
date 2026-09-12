@@ -39,7 +39,7 @@ def test_compute_selection_is_validated_by_library():
 
 def test_providers_come_from_onces_registry():
     assert validate.slots == ["provider-dns"]
-    assert matching({**base, "provider-backend": "gcs"}, "provider-backend")
+    assert matching({**base, "provider-backend": "azure"}, "provider-backend")
     r2 = {**base, "provider-backend": "r2",
           "r2-bucket": "b", "r2-endpoint": "https://r2.example",
           "hcloud-token": "token"}

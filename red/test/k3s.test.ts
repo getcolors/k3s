@@ -58,7 +58,7 @@ describe("validate", () => {
 
   test("providers come from ONCE's registry", () => {
     expect(validate.slots).toEqual(["provider-dns"]);
-    expect(matching({ ...base, "provider-backend": "gcs" }, /provider-backend/).length)
+    expect(matching({ ...base, "provider-backend": "azure" }, /provider-backend/).length)
       .toBeGreaterThan(0);
     const r2 = {
       ...base, "provider-backend": "r2",

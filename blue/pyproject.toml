@@ -5,7 +5,7 @@ description = "Blue/Python implementation of the K3s package"
 requires-python = ">=3.11"
 dependencies = [
   "blue @ git+https://github.com/getcolors/blue.git@290f313ead5ca162875c33a049c880da017eae09",
-  "colors-compute-blue @ git+https://github.com/getcolors/colors-compute.git@01635b47b3ca328402924418cb822180df2e7a3f#subdirectory=blue",
+  "colors-compute-blue @ git+https://github.com/getcolors/colors-compute.git@ae28ea74962bb1897fa6365c143c1d43ac1fe095#subdirectory=blue",
 ]
 
 [dependency-groups]
